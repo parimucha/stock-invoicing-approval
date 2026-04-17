@@ -15,6 +15,7 @@ type Props = {
   token: string;
   projects: Project[];
   locked: boolean;
+  jiraBaseUrl: string | null;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -22,7 +23,13 @@ type SaveState = "idle" | "saving" | "saved" | "error";
 const DEBOUNCE_MS = 600;
 const SAVED_INDICATOR_MS = 1500;
 
-export function ItemCard({ item, token, projects, locked }: Props) {
+const APPROVAL_CARD_STYLES: Record<Approval, string> = {
+  approved: "border-green-300 bg-green-50/60",
+  rejected: "border-red-300 bg-red-50/60",
+  pending: "border-neutral-200 bg-white",
+};
+
+export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) {
   const [assigned, setAssigned] = useState<string[]>(() =>
     [...item.assignments.map((a) => a.projectId)].sort(),
   );
@@ -95,23 +102,16 @@ export function ItemCard({ item, token, projects, locked }: Props) {
   }
 
   const radioName = `approval-${item.id}`;
+  const cardClass = `border rounded-lg p-4 space-y-3 transition-colors ${APPROVAL_CARD_STYLES[approval]}`;
 
   return (
-    <div className="bg-white border border-neutral-200 rounded-lg p-4 space-y-3">
+    <div className={cardClass}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            {item.jiraKey ? (
-              <code className="text-xs bg-neutral-100 rounded px-1.5 py-0.5">
-                {item.jiraKey}
-              </code>
-            ) : (
-              <span className="text-xs uppercase text-neutral-500">PM</span>
-            )}
+            <JiraKey jiraKey={item.jiraKey} jiraBaseUrl={jiraBaseUrl} />
             {item.jiraIssuetype && <IssueTypeBadge type={item.jiraIssuetype} />}
-            {item.jiraStatus && (
-              <span className="text-xs text-neutral-500">{item.jiraStatus}</span>
-            )}
+            {item.jiraStatus && <JiraStatusBadge status={item.jiraStatus} />}
           </div>
           <div className="mt-1 font-medium">{item.summary}</div>
           {item.parentSummary && (
@@ -151,7 +151,7 @@ export function ItemCard({ item, token, projects, locked }: Props) {
         </details>
       )}
 
-      <div className="grid md:grid-cols-2 gap-4 pt-2 border-t border-neutral-100">
+      <div className="grid md:grid-cols-2 gap-4 pt-2 border-t border-neutral-200/60">
         <div>
           <div className="text-xs font-medium text-neutral-600 mb-1">Projects</div>
           <div className="space-y-1">
@@ -180,13 +180,13 @@ export function ItemCard({ item, token, projects, locked }: Props) {
             onBlur={flush}
             rows={4}
             disabled={locked}
-            className="w-full text-sm border border-neutral-300 rounded px-2 py-1 disabled:bg-neutral-50"
+            className="w-full text-sm border border-neutral-300 bg-white rounded px-2 py-1 disabled:bg-neutral-50"
             placeholder="Optional feedback for PORTA…"
           />
         </div>
       </div>
 
-      <div className="flex items-center justify-between pt-2 border-t border-neutral-100">
+      <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
         <div className="flex gap-4 text-sm">
           {(["approved", "rejected", "pending"] as const).map((v) => (
             <label key={v} className="flex items-center gap-1">
@@ -210,6 +210,32 @@ export function ItemCard({ item, token, projects, locked }: Props) {
   );
 }
 
+function JiraKey({
+  jiraKey,
+  jiraBaseUrl,
+}: {
+  jiraKey: string | null;
+  jiraBaseUrl: string | null;
+}) {
+  if (!jiraKey) return <span className="text-xs uppercase text-neutral-500">PM</span>;
+  if (!jiraBaseUrl) {
+    return (
+      <code className="text-xs bg-neutral-100 rounded px-1.5 py-0.5">{jiraKey}</code>
+    );
+  }
+  return (
+    <a
+      href={`${jiraBaseUrl}/browse/${jiraKey}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="text-xs font-mono bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded px-1.5 py-0.5 hover:underline"
+      title="Open in JIRA"
+    >
+      {jiraKey}
+    </a>
+  );
+}
+
 function SaveIndicator({ state, locked }: { state: SaveState; locked: boolean }) {
   if (locked) return <span className="text-xs text-neutral-400">Locked</span>;
   if (state === "saving") return <span className="text-xs text-neutral-500">Saving…</span>;
@@ -222,15 +248,34 @@ function SaveIndicator({ state, locked }: { state: SaveState; locked: boolean })
 function IssueTypeBadge({ type }: { type: string }) {
   const lower = type.toLowerCase();
   const styles = lower.includes("bug")
-    ? "bg-red-50 text-red-700"
+    ? "bg-red-50 text-red-700 border border-red-200"
     : lower.includes("sub")
-      ? "bg-neutral-100 text-neutral-600"
+      ? "bg-neutral-100 text-neutral-600 border border-neutral-200"
       : lower.includes("scope")
-        ? "bg-purple-50 text-purple-700"
-        : "bg-blue-50 text-blue-700";
+        ? "bg-purple-50 text-purple-700 border border-purple-200"
+        : "bg-blue-50 text-blue-700 border border-blue-200";
   return (
     <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${styles}`}>
       {type}
+    </span>
+  );
+}
+
+function JiraStatusBadge({ status }: { status: string }) {
+  const lower = status.toLowerCase();
+  let styles = "bg-neutral-100 text-neutral-700 border border-neutral-200";
+  if (/done|deployed|closed|resolved/.test(lower)) {
+    styles = "bg-green-50 text-green-700 border border-green-200";
+  } else if (/in progress|in review/.test(lower)) {
+    styles = "bg-blue-50 text-blue-700 border border-blue-200";
+  } else if (/verification|ready|to do|open|backlog/.test(lower)) {
+    styles = "bg-amber-50 text-amber-800 border border-amber-200";
+  } else if (/rejected|cancel|won't/.test(lower)) {
+    styles = "bg-red-50 text-red-700 border border-red-200";
+  }
+  return (
+    <span className={`inline-block rounded px-1.5 py-0.5 text-xs font-medium ${styles}`}>
+      {status}
     </span>
   );
 }

@@ -40,18 +40,21 @@ export default async function ReviewPage({
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
   const locked = report.status === "approved" || report.status === "rejected";
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
+  const jiraBaseUrl = process.env.JIRA_BASE_URL?.replace(/\/+$/, "") || null;
 
-  // Group items by current assignment (first assigned project wins, to avoid
-  // duplication). Items with no assignments fall into "Unassigned".
+  // Group items by the INGEST-TIME suggestion so cards stay put while the
+  // reviewer edits assignments. The invoice overview below uses the current
+  // assignments and updates live after each autosave.
   const groups: { name: string; items: ItemWithAssignments[] }[] = [];
   const order = [...projects.map((p) => p.name), "Unassigned"];
   for (const name of order) groups.push({ name, items: [] });
   const byName = new Map(groups.map((g) => [g.name, g] as const));
   for (const it of report.items) {
+    const suggested = it.suggestedProjects as string[];
     const firstProjectName =
-      it.assignments.length === 0
+      suggested.length === 0
         ? "Unassigned"
-        : (projects.find((p) => p.id === it.assignments[0].projectId)?.name ?? "Unassigned");
+        : (projects.find((p) => p.id === suggested[0])?.name ?? "Unassigned");
     const bucket = byName.get(firstProjectName) ?? byName.get("Unassigned")!;
     bucket.items.push(it);
   }
@@ -111,6 +114,7 @@ export default async function ReviewPage({
                     token={token}
                     projects={projects}
                     locked={locked}
+                    jiraBaseUrl={jiraBaseUrl}
                   />
                 ))}
               </div>
