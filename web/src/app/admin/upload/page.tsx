@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { parseUploadReport } from "@/lib/report-schema";
 import { newMagicToken } from "@/lib/auth";
+import { PendingButton } from "@/components/PendingButton";
 
 async function uploadReport(formData: FormData) {
   "use server";
@@ -100,12 +101,12 @@ export default function UploadPage() {
           />
         </label>
 
-        <button
-          type="submit"
+        <PendingButton
           className="bg-neutral-900 text-white rounded px-4 py-2 text-sm hover:bg-neutral-800"
+          pendingLabel="Creating report…"
         >
           Create report
-        </button>
+        </PendingButton>
       </form>
     </div>
   );

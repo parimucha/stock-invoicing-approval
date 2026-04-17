@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { minutesToHours } from "@/lib/format";
 import { saveReviewerNote, signOff } from "./actions";
 import { ItemCard } from "./ItemCard";
+import { PendingButton } from "@/components/PendingButton";
 import type { ReportItem } from "@prisma/client";
 
 type ItemWithAssignments = ReportItem & {
@@ -129,9 +130,12 @@ export default async function ReviewPage({
                 className="w-full border border-neutral-300 rounded px-3 py-2 text-sm"
                 placeholder="Any overall comment for the whole report…"
               />
-              <button className="bg-neutral-900 text-white rounded px-3 py-1.5 text-sm hover:bg-neutral-800">
+              <PendingButton
+                className="bg-neutral-900 text-white rounded px-3 py-1.5 text-sm hover:bg-neutral-800"
+                pendingLabel="Saving…"
+              >
                 Save note
-              </button>
+              </PendingButton>
             </form>
           </section>
         )}
@@ -148,16 +152,22 @@ export default async function ReviewPage({
               <form action={signOff}>
                 <input type="hidden" name="token" value={token} />
                 <input type="hidden" name="decision" value="approved" />
-                <button className="bg-green-600 text-white rounded px-4 py-2 text-sm hover:bg-green-700">
+                <PendingButton
+                  className="bg-green-600 text-white rounded px-4 py-2 text-sm hover:bg-green-700"
+                  pendingLabel="Approving…"
+                >
                   Approve report
-                </button>
+                </PendingButton>
               </form>
               <form action={signOff}>
                 <input type="hidden" name="token" value={token} />
                 <input type="hidden" name="decision" value="rejected" />
-                <button className="bg-red-600 text-white rounded px-4 py-2 text-sm hover:bg-red-700">
+                <PendingButton
+                  className="bg-red-600 text-white rounded px-4 py-2 text-sm hover:bg-red-700"
+                  pendingLabel="Rejecting…"
+                >
                   Reject report
-                </button>
+                </PendingButton>
               </form>
               <p className="text-xs text-neutral-500 self-center">
                 After sign-off the report is locked.

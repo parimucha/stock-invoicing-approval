@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
+import { PendingButton } from "@/components/PendingButton";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -100,17 +101,23 @@ export default async function ReportDetailPage({
           {report.status === "draft" && (
             <form action={markSent}>
               <input type="hidden" name="id" value={report.id} />
-              <button className="bg-neutral-900 text-white rounded px-3 py-1.5 text-sm hover:bg-neutral-800">
+              <PendingButton
+                className="bg-neutral-900 text-white rounded px-3 py-1.5 text-sm hover:bg-neutral-800"
+                pendingLabel="Marking…"
+              >
                 Mark as sent
-              </button>
+              </PendingButton>
             </form>
           )}
           {(report.status === "sent" || report.status === "under_review") && (
             <form action={reopen}>
               <input type="hidden" name="id" value={report.id} />
-              <button className="border border-neutral-300 rounded px-3 py-1.5 text-sm hover:bg-neutral-50">
+              <PendingButton
+                className="border border-neutral-300 rounded px-3 py-1.5 text-sm hover:bg-neutral-50"
+                pendingLabel="Reopening…"
+              >
                 Reopen as draft
-              </button>
+              </PendingButton>
             </form>
           )}
         </div>
