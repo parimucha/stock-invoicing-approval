@@ -1,0 +1,87 @@
+"use server";
+
+import { notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
+
+async function loadReport(token: string) {
+  const report = await prisma.report.findUnique({ where: { magicToken: token } });
+  if (!report) notFound();
+  return report;
+}
+
+function isLocked(status: string): boolean {
+  return status === "approved" || status === "rejected";
+}
+
+async function ensureUnderReview(reportId: number, currentStatus: string) {
+  if (currentStatus === "sent") {
+    await prisma.report.update({
+      where: { id: reportId },
+      data: { status: "under_review" },
+    });
+  }
+}
+
+export async function saveItem(formData: FormData) {
+  const token = String(formData.get("token"));
+  const itemId = Number(formData.get("itemId"));
+  const report = await loadReport(token);
+  if (isLocked(report.status)) throw new Error("Report is locked.");
+
+  const approval = String(formData.get("approval") ?? "pending") as
+    | "pending"
+    | "approved"
+    | "rejected";
+  const comment = String(formData.get("comment") ?? "").trim();
+  const projectIds = formData.getAll("projects").map(String).filter(Boolean);
+
+  const item = await prisma.reportItem.findUnique({ where: { id: itemId } });
+  if (!item || item.reportId !== report.id) throw new Error("Item not found.");
+
+  await prisma.$transaction([
+    prisma.projectAssignment.deleteMany({ where: { itemId } }),
+    prisma.projectAssignment.createMany({
+      data: projectIds.map((pid) => ({ itemId, projectId: pid })),
+      skipDuplicates: true,
+    }),
+    prisma.reportItem.update({
+      where: { id: itemId },
+      data: { approval, reviewerComment: comment || null },
+    }),
+  ]);
+  await ensureUnderReview(report.id, report.status);
+  revalidatePath(`/review/${token}`);
+  revalidatePath(`/admin/reports/${report.id}`);
+}
+
+export async function saveReviewerNote(formData: FormData) {
+  const token = String(formData.get("token"));
+  const note = String(formData.get("note") ?? "").trim();
+  const report = await loadReport(token);
+  if (isLocked(report.status)) throw new Error("Report is locked.");
+  await prisma.report.update({
+    where: { id: report.id },
+    data: { reviewerNote: note || null },
+  });
+  await ensureUnderReview(report.id, report.status);
+  revalidatePath(`/review/${token}`);
+  revalidatePath(`/admin/reports/${report.id}`);
+}
+
+export async function signOff(formData: FormData) {
+  const token = String(formData.get("token"));
+  const decision = String(formData.get("decision"));
+  if (decision !== "approved" && decision !== "rejected") {
+    throw new Error("Invalid decision.");
+  }
+  const report = await loadReport(token);
+  if (isLocked(report.status)) throw new Error("Report is already signed off.");
+
+  await prisma.report.update({
+    where: { id: report.id },
+    data: { status: decision, reviewedAt: new Date() },
+  });
+  revalidatePath(`/review/${token}`);
+  revalidatePath(`/admin/reports/${report.id}`);
+}

@@ -68,6 +68,7 @@ Two pieces, loosely coupled via a **report JSON file**:
 | worked_hours | decimal | sum from Productive |
 | estimated_hours | decimal? | from JIRA estimate |
 | diff_hours | decimal? | estimated − worked (computed; can also be done client-side) |
+| jira_issuetype | string? | e.g. `Task`, `Bug`, `Sub-task`, `Scope Change Request` — rendered as a badge so client can tell feature vs. bug |
 | jira_labels | json | raw labels |
 | parent_key / parent_summary | string? | from JIRA |
 | pm_notes | text? | concatenated/summarized Productive notes for PM items |
@@ -81,41 +82,51 @@ Two pieces, loosely coupled via a **report JSON file**:
 - `french_pimcore` — "French Pimcore"
 - `sap_spirit` — "SAP Spirit"
 
-## Label → project mapping (fuzzy)
+## JIRA → project mapping rules
 
-Hard-coded rules, case-insensitive substring match on JIRA labels:
+Projects are always three: **Czech Pimcore**, **French Pimcore**, **SAP Spirit**.
+Other work (Slovak, General, etc.) is left **Unassigned** at ingest; the reviewer assigns it manually.
 
-| Project | Matches any of |
-|---|---|
-| Czech Pimcore | `cz`, `czech` |
-| French Pimcore | `fr`, `french`, `france` |
-| SAP Spirit | `sap` |
+Mapping is evaluated in this order (first strong match wins; labels are a weaker fallback):
 
-Rules applied during ingestion to set `suggested_projects`. Outcomes:
-- 0 matches → empty, Stock picks.
-- 1 match → pre-selected, Stock can change.
-- 2+ matches → all pre-selected, Stock confirms/edits.
-- PM items (no JIRA) → empty, Stock assigns.
+1. **JIRA project namespace** (strongest):
+   - Key prefix `SAPS-` → **SAP Spirit** (always).
+2. **Parent issue** (primary signal for PCM2 tickets):
+   - Parent `PCM2-91` (PIM CZ) → **Czech Pimcore**.
+   - Parent `PCM2-92` (PIM FR) → **French Pimcore**.
+   - Parent `PCM2-124` (PIM SK) → **Unassigned** (Slovak, not in the 3 projects).
+   - Any other parent (`PCM2-93 General`, etc.) → skip, go to labels.
+3. **Labels** (fallback when parent didn't match):
+   - Label `CZ` → Czech Pimcore.
+   - Label `France` → French Pimcore.
+   - (`SAP` is **not** a project indicator — it's cross-cutting on CZ/FR/SK tickets.)
 
-**Billing split:** when an item has N assigned projects, its `worked_hours` is split **evenly** (1/N per project) in the invoice overview.
+Multiple matches across these rules are allowed → all are pre-selected; reviewer confirms.
+
+**PM items** (no JIRA key) → always Unassigned at ingest. Reviewer assigns them. The Productive `service` suffix (`Pimcore development - CZ / FR / SK`) may be surfaced as a hint in the UI.
+
+**Billing split:** when an item has N assigned projects, its `worked_hours` is split **evenly** (1/N per project) in the invoice overview. Items left Unassigned are excluded from the invoice overview until assigned.
+
+**Missing JIRA estimate:** render as blank in both the estimate and diff columns.
 
 ## Local ingestion flow (monthly)
 
-Run in Claude Code in this repo:
+Run locally from this repo (`scripts/…`) with credentials in `.env` (git-ignored).
 
-> "Generate report for April 2026."
+1. **Pull Productive time entries** via **raw Productive REST API** (not MCP — the MCP wrapper strips JIRA fields). Script: `scripts/pull-productive-entries.js`. Given a deal ID + date range, it writes `data/<YYYY-MM>/raw/productive-entries.json` with:
+   - date, minutes, note (HTML + stripped text), person, service
+   - `jira_key` resolved from `jira_issue_id` (native Productive field); if that's empty, falls back to **regex on the note** (`\b[A-Z][A-Z0-9]+-\d+\b`) because team members sometimes only paste the key into the note
+   - `jira_key_source` tag (`productive_field` vs `note_regex`) for transparency
+2. **Extract distinct JIRA keys** from the Productive entries.
+3. **Pull JIRA metadata** for those keys via the Atlassian MCP using batched JQL (`key in (...)`, ~10 keys per batch to stay responsive). Save to `data/<YYYY-MM>/raw/jira-issues.json`. Fields: summary, labels, parent key/summary, `timeoriginalestimate`, issuetype, status.
+4. **Group entries**:
+   - JIRA-linked → one row per `jira_key`, summing minutes across entries/people.
+   - PM (no JIRA) → grouped by **Productive note** (normalized: lowercase, strip HTML, strip `PM:` / `call:` prefixes, collapse whitespace). Notes with obvious typos can be merged in a second pass once we see volume. Entries with truly empty notes fall back to `(person, service)` bucket — rare in practice (raw API plus note-regex recovered all 169 entries in March).
+5. **Apply the mapping rules** above to produce `suggested_projects` per row.
+6. **Emit** `data/<YYYY-MM>/report.json` matching the app schema.
+7. Upload JSON via PORTA admin page in the web app.
 
-Claude Code:
-1. Uses Productive MCP to find the Stock monthly budget for the period → lists time entries.
-2. Groups entries:
-   - With JIRA key in task name/description → grouped by JIRA key.
-   - Without JIRA key → bucketed as PM items, **grouped primarily by the Productive note**. Final grouping rule (e.g. exact match, normalized match, fallback to task name when note is empty) will be decided once we pull a real month and see the data.
-3. For each JIRA key, uses JIRA MCP to fetch: summary, estimate, labels, parent.
-4. Applies the label → project mapping to produce `suggested_projects`.
-5. Writes `reports/<YYYY-MM>.json` locally, matching the schema above.
-6. User uploads JSON via PORTA admin page.
-
-No API tokens stored in the app. MCP handles auth in the Claude Code session.
+No API tokens ever touch the hosted web app. Credentials live only in the local `.env`.
 
 ## Web app pages
 
@@ -159,9 +170,12 @@ draft → sent → under_review → approved
 
 1. **Framework:** Next.js (TypeScript).
 2. **Local dev:** Docker (`app` + `db`). Production deploy method decided later based on what Cloudways supports.
-3. **PM grouping:** primarily by Productive note; finalize the rule after a real data pull.
+3. **PM grouping:** primarily by Productive note, normalized.
 4. **Re-upload behavior:** replace if status is `draft` or `sent`; block if `under_review` or `approved` (force explicit unlock if ever needed).
 5. **Magic link:** never expires. Report is locked once signed off, so a live link is read-only.
+6. **Ingestion data sources:** raw Productive REST API (local, token in `.env`) + Atlassian MCP for JIRA metadata (batched JQL).
+7. **JIRA key resolution:** Productive's native `jira_issue_id` first, regex over the note as fallback.
+8. **Project mapping:** SAPS prefix > parent issue > label (fallback). Slovak / General / other → Unassigned at ingest, reviewer assigns.
 
 ## Proposed build order
 

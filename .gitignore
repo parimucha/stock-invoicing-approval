@@ -4,3 +4,6 @@ node_modules/
 .env.*.local
 .DS_Store
 *.log
+
+# Local ingestion output — contains employee time entries and internal JIRA metadata.
+data/

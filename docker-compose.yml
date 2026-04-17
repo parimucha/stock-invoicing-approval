@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16
+    container_name: stock_report_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: stock_report
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: apppw
+    ports:
+      - "5433:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d stock_report"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg_data:

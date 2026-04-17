@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum ReportStatus {
+  draft
+  sent
+  under_review
+  approved
+  rejected
+}
+
+enum ItemSource {
+  jira
+  project_management
+}
+
+enum Approval {
+  pending
+  approved
+  rejected
+}
+
+model Project {
+  id         String        @id
+  name       String        @unique
+  sortOrder  Int           @default(0)
+  assignments ProjectAssignment[]
+}
+
+model Report {
+  id                   Int          @id @default(autoincrement())
+  label                String       @unique
+  periodStart          DateTime     @db.Date
+  periodEnd            DateTime     @db.Date
+  productiveDealId     String?
+  productiveBudgetName String?
+  status               ReportStatus @default(draft)
+  magicToken           String       @unique
+  reviewerNote         String?      @db.Text
+  createdAt            DateTime     @default(now())
+  sentAt               DateTime?
+  reviewedAt           DateTime?
+  items                ReportItem[]
+}
+
+model ReportItem {
+  id                Int         @id @default(autoincrement())
+  reportId          Int
+  report            Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  source            ItemSource
+  jiraKey           String?
+  summary           String      @db.Text
+  workedMinutes     Int
+  estimatedSeconds  Int?
+  jiraIssuetype     String?
+  jiraStatus        String?
+  jiraLabels        Json
+  parentKey         String?
+  parentSummary     String?
+  pmNotes           String?     @db.Text
+  suggestedProjects Json
+  approval          Approval    @default(pending)
+  reviewerComment   String?     @db.Text
+  assignments       ProjectAssignment[]
+
+  @@index([reportId])
+}
+
+model ProjectAssignment {
+  itemId    Int
+  projectId String
+  item      ReportItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, projectId])
+  @@index([projectId])
+}
