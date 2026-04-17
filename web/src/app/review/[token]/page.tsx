@@ -188,7 +188,7 @@ function InvoiceOverview({
   totalMinutes: number;
 }) {
   return (
-    <section className="bg-white border border-neutral-200 rounded-lg p-5">
+    <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm">
       <h2 className="text-lg font-semibold mb-3">Invoice overview</h2>
       <p className="text-sm text-neutral-600 mb-3">
         Hours per project based on current assignments. Items assigned to multiple projects
