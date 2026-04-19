@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
@@ -170,77 +171,95 @@ export default async function ReportDetailPage({
             </tr>
           </thead>
           <tbody>
-            {report.items.map((it) => (
-              <tr key={it.id} className="border-t border-neutral-100 align-top">
-                <td className="px-3 py-2 font-mono text-xs">
-                  {it.jiraKey ? (
-                    <JiraLink
-                      jiraKey={it.jiraKey}
-                      jiraBaseUrl={jiraBaseUrl}
-                      className="hover:underline"
-                    />
-                  ) : (
-                    <span className="text-neutral-400">PM</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  {it.jiraIssuetype && <IssueTypeBadge type={it.jiraIssuetype} />}
-                </td>
-                <td className="px-3 py-2">
-                  <div>{it.summary}</div>
-                  {it.parentSummary && (
-                    <div className="text-xs text-neutral-500">
-                      parent:{" "}
-                      <JiraLink
-                        jiraKey={it.parentKey}
-                        jiraBaseUrl={jiraBaseUrl}
-                        className="font-mono hover:underline"
-                      />{" "}
-                      {it.parentSummary}
-                    </div>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right">
-                  <div>{minutesToHours(it.workedMinutes)}</div>
-                  <BudgetBar
-                    workedMinutes={it.workedMinutes}
-                    estimatedSeconds={it.estimatedSeconds}
-                    className="mt-1 w-24 ml-auto"
-                  />
-                </td>
-                <td className="px-3 py-2 text-right">{secondsToHours(it.estimatedSeconds)}</td>
-                <td className="px-3 py-2 text-right">
-                  {diffHours(it.estimatedSeconds, it.workedMinutes)}
-                </td>
-                <td className="px-3 py-2">
-                  {it.assignments.length === 0 ? (
-                    <span className="text-xs text-neutral-400">Unassigned</span>
-                  ) : (
-                    it.assignments.map((a) => a.project.name).join(", ")
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  <ApprovalBadge approval={it.approval} />
-                  {it.reviewerComment && (
-                    <div className="text-xs text-neutral-500 italic mt-1">
-                      “{it.reviewerComment}”
-                    </div>
-                  )}
-                </td>
-                {editable && (
-                  <td className="px-3 py-2 align-top">
-                    {it.source === "project_management" ? (
-                      <PmEditCell
-                        reportId={report.id}
-                        itemId={it.id}
-                        summary={it.summary}
-                        targets={mergeTargets.filter((t) => t.id !== it.id)}
+            {report.items.map((it) => {
+              const canEdit = editable && it.source === "project_management";
+              return (
+                <Fragment key={it.id}>
+                  <tr className="border-t border-neutral-100 align-top">
+                    <td className="px-3 py-2 font-mono text-xs">
+                      {it.jiraKey ? (
+                        <JiraLink
+                          jiraKey={it.jiraKey}
+                          jiraBaseUrl={jiraBaseUrl}
+                          className="hover:underline"
+                        />
+                      ) : (
+                        <span className="text-neutral-400">PM</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      {it.jiraIssuetype && <IssueTypeBadge type={it.jiraIssuetype} />}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div>{it.summary}</div>
+                      {it.parentSummary && (
+                        <div className="text-xs text-neutral-500">
+                          parent:{" "}
+                          <JiraLink
+                            jiraKey={it.parentKey}
+                            jiraBaseUrl={jiraBaseUrl}
+                            className="font-mono hover:underline"
+                          />{" "}
+                          {it.parentSummary}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div>{minutesToHours(it.workedMinutes)}</div>
+                      <BudgetBar
+                        workedMinutes={it.workedMinutes}
+                        estimatedSeconds={it.estimatedSeconds}
+                        className="mt-1 w-24 ml-auto"
                       />
-                    ) : null}
-                  </td>
-                )}
-              </tr>
-            ))}
+                    </td>
+                    <td className="px-3 py-2 text-right">{secondsToHours(it.estimatedSeconds)}</td>
+                    <td className="px-3 py-2 text-right">
+                      {diffHours(it.estimatedSeconds, it.workedMinutes)}
+                    </td>
+                    <td className="px-3 py-2">
+                      {it.assignments.length === 0 ? (
+                        <span className="text-xs text-neutral-400">Unassigned</span>
+                      ) : (
+                        it.assignments.map((a) => a.project.name).join(", ")
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <ApprovalBadge approval={it.approval} />
+                      {it.reviewerComment && (
+                        <div className="text-xs text-neutral-500 italic mt-1">
+                          “{it.reviewerComment}”
+                        </div>
+                      )}
+                    </td>
+                    {editable && (
+                      <td className="px-3 py-2 align-top">
+                        {canEdit && (
+                          <details className="inline-block">
+                            <summary className="cursor-pointer list-none select-none text-xs">
+                              <span className="inline-block rounded border border-neutral-300 bg-white px-2 py-0.5 hover:bg-neutral-50">
+                                Edit
+                              </span>
+                            </summary>
+                          </details>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                  {canEdit && (
+                    <tr className="edit-row bg-neutral-50 border-t border-neutral-100">
+                      <td colSpan={9} className="px-4 py-3">
+                        <PmEditPanel
+                          reportId={report.id}
+                          itemId={it.id}
+                          summary={it.summary}
+                          targets={mergeTargets.filter((t) => t.id !== it.id)}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </section>
@@ -273,7 +292,7 @@ function IssueTypeBadge({ type }: { type: string }) {
 
 type MergeTarget = { id: number; label: string; isJira: boolean };
 
-function PmEditCell({
+function PmEditPanel({
   reportId,
   itemId,
   summary,
@@ -287,77 +306,70 @@ function PmEditCell({
   const jiraTargets = targets.filter((t) => t.isJira);
   const pmTargets = targets.filter((t) => !t.isJira);
   return (
-    <details className="group">
-      <summary className="cursor-pointer list-none text-xs text-neutral-700 hover:text-neutral-900 select-none">
-        <span className="inline-block rounded border border-neutral-300 bg-white px-2 py-0.5 group-open:bg-neutral-900 group-open:text-white group-open:border-neutral-900">
-          Edit
-        </span>
-      </summary>
-      <div className="mt-2 space-y-3 w-72">
-        <form action={updateItemSummary} className="space-y-1">
+    <div className="grid gap-6 md:grid-cols-2">
+      <form action={updateItemSummary} className="space-y-1.5">
+        <input type="hidden" name="reportId" value={reportId} />
+        <input type="hidden" name="itemId" value={itemId} />
+        <label className="block text-xs font-medium text-neutral-600">Summary</label>
+        <input
+          name="summary"
+          defaultValue={summary}
+          required
+          className="w-full text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
+        />
+        <PendingButton
+          className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
+          pendingLabel="Saving…"
+        >
+          Save summary
+        </PendingButton>
+      </form>
+
+      {targets.length > 0 && (
+        <form action={mergeItems} className="space-y-1.5">
           <input type="hidden" name="reportId" value={reportId} />
-          <input type="hidden" name="itemId" value={itemId} />
-          <label className="block text-xs text-neutral-600">Summary</label>
-          <input
-            name="summary"
-            defaultValue={summary}
+          <input type="hidden" name="sourceId" value={itemId} />
+          <label className="block text-xs font-medium text-neutral-600">Merge into…</label>
+          <select
+            name="targetId"
             required
-            className="w-full text-xs border border-neutral-300 rounded px-2 py-1"
-          />
-          <PendingButton
-            className="text-xs border border-neutral-300 rounded px-2 py-0.5 hover:bg-neutral-50"
-            pendingLabel="Saving…"
+            defaultValue=""
+            className="w-full text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
           >
-            Save summary
+            <option value="" disabled>
+              Pick a target…
+            </option>
+            {jiraTargets.length > 0 && (
+              <optgroup label="JIRA items">
+                {jiraTargets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {pmTargets.length > 0 && (
+              <optgroup label="PM items">
+                {pmTargets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          <p className="text-xs text-neutral-500">
+            Minutes sum into the target; this row&apos;s notes are appended and the row is removed.
+          </p>
+          <PendingButton
+            className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
+            pendingLabel="Merging…"
+          >
+            Merge
           </PendingButton>
         </form>
-
-        {targets.length > 0 && (
-          <form action={mergeItems} className="space-y-1">
-            <input type="hidden" name="reportId" value={reportId} />
-            <input type="hidden" name="sourceId" value={itemId} />
-            <label className="block text-xs text-neutral-600">Merge into…</label>
-            <select
-              name="targetId"
-              required
-              defaultValue=""
-              className="w-full text-xs border border-neutral-300 rounded px-2 py-1"
-            >
-              <option value="" disabled>
-                Pick a target…
-              </option>
-              {jiraTargets.length > 0 && (
-                <optgroup label="JIRA items">
-                  {jiraTargets.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-              {pmTargets.length > 0 && (
-                <optgroup label="PM items">
-                  {pmTargets.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.label}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-            <p className="text-xs text-neutral-500">
-              Minutes sum into the target; this row&apos;s notes are appended and the row is removed.
-            </p>
-            <PendingButton
-              className="text-xs border border-neutral-300 rounded px-2 py-0.5 hover:bg-neutral-50"
-              pendingLabel="Merging…"
-            >
-              Merge
-            </PendingButton>
-          </form>
-        )}
-      </div>
-    </details>
+      )}
+    </div>
   );
 }
 

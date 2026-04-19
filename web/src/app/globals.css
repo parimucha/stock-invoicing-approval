@@ -23,3 +23,12 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   color: #171717;
 }
+
+/* Admin report table: the edit-row is a full-width secondary <tr> that
+   reveals itself when the preceding row's <details> toggle is open. */
+tr.edit-row {
+  display: none;
+}
+tr:has(details[open]) + tr.edit-row {
+  display: table-row;
+}
