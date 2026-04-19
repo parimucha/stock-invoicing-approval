@@ -17,6 +17,7 @@ export default async function ReviewPage({
     where: { magicToken: token },
     include: {
       items: {
+        where: { internal: false },
         orderBy: [{ workedMinutes: "desc" }],
         include: { assignments: true },
       },

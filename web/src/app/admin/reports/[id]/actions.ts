@@ -116,6 +116,24 @@ export async function resetReport(formData: FormData) {
   revalidatePath(`/review/${report.magicToken}`);
 }
 
+export async function toggleInternal(formData: FormData) {
+  const reportId = Number(formData.get("reportId"));
+  const itemId = Number(formData.get("itemId"));
+  if (!reportId || !itemId) throw new Error("Missing ids.");
+
+  const report = await loadDraftReport(reportId);
+
+  const item = await prisma.reportItem.findUnique({ where: { id: itemId } });
+  if (!item || item.reportId !== report.id) notFound();
+
+  await prisma.reportItem.update({
+    where: { id: itemId },
+    data: { internal: !item.internal },
+  });
+
+  revalidatePath(`/admin/reports/${reportId}`);
+}
+
 export async function updatePortaNotes(formData: FormData) {
   const reportId = Number(formData.get("reportId"));
   const itemId = Number(formData.get("itemId"));

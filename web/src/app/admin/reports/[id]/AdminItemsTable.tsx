@@ -7,7 +7,7 @@ import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
-import { mergeItems, updateItemSummary, updatePortaNotes } from "./actions";
+import { mergeItems, toggleInternal, updateItemSummary, updatePortaNotes } from "./actions";
 
 export type MergeTarget = { id: number; label: string; isJira: boolean };
 
@@ -121,9 +121,12 @@ export function AdminItemsTable({
             {sorted.map((it) => {
               const canEdit = editable;
               const isPm = it.source === "project_management";
+              const rowClass = it.internal
+                ? "border-t border-neutral-100 align-top bg-neutral-50/60 text-neutral-500"
+                : "border-t border-neutral-100 align-top";
               return (
                 <Fragment key={it.id}>
-                  <tr className="border-t border-neutral-100 align-top">
+                  <tr className={rowClass}>
                     <td className="px-3 py-2 font-mono text-xs">
                       {it.jiraKey ? (
                         <JiraLink
@@ -139,7 +142,10 @@ export function AdminItemsTable({
                       {it.jiraIssuetype && <IssueTypeBadge type={it.jiraIssuetype} />}
                     </td>
                     <td className="px-3 py-2">
-                      <div>{it.summary}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{it.summary}</span>
+                        {it.internal && <InternalBadge />}
+                      </div>
                       {it.parentSummary && (
                         <div className="text-xs text-neutral-500">
                           parent:{" "}
@@ -208,6 +214,7 @@ export function AdminItemsTable({
                           itemId={it.id}
                           summary={it.summary}
                           portaNotes={it.portaNotes}
+                          internal={it.internal}
                           isPm={isPm}
                           targets={mergeTargets.filter((t) => t.id !== it.id)}
                         />
@@ -361,6 +368,7 @@ function EditPanel({
   itemId,
   summary,
   portaNotes,
+  internal,
   isPm,
   targets,
 }: {
@@ -368,6 +376,7 @@ function EditPanel({
   itemId: number;
   summary: string;
   portaNotes: string | null;
+  internal: boolean;
   isPm: boolean;
   targets: MergeTarget[];
 }) {
@@ -375,6 +384,21 @@ function EditPanel({
   const pmTargets = targets.filter((t) => !t.isJira);
   return (
     <div className="space-y-4">
+      <form action={toggleInternal}>
+        <input type="hidden" name="reportId" value={reportId} />
+        <input type="hidden" name="itemId" value={itemId} />
+        <PendingButton
+          className={`text-xs rounded px-2 py-1 border ${
+            internal
+              ? "bg-amber-100 border-amber-300 text-amber-900 hover:bg-amber-50"
+              : "border-neutral-300 bg-white hover:bg-white text-neutral-700"
+          }`}
+          pendingLabel="Saving…"
+        >
+          {internal ? "Unmark internal" : "Mark as internal (hide from client)"}
+        </PendingButton>
+      </form>
+
       <form action={updatePortaNotes} className="space-y-1.5">
         <input type="hidden" name="reportId" value={reportId} />
         <input type="hidden" name="itemId" value={itemId} />
@@ -466,6 +490,14 @@ function EditPanel({
         </div>
       )}
     </div>
+  );
+}
+
+function InternalBadge() {
+  return (
+    <span className="inline-block rounded px-1.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-900 border border-amber-200">
+      Internal
+    </span>
   );
 }
 

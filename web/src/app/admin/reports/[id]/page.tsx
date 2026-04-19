@@ -66,11 +66,17 @@ export default async function ReportDetailPage({
   const magicUrl = `${proto}://${host}/review/${report.magicToken}`;
 
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
+  const internalMinutes = report.items.reduce(
+    (s, i) => (i.internal ? s + i.workedMinutes : s),
+    0,
+  );
 
-  // Per-project preview (even-split of worked time)
+  // Per-project preview (even-split of worked time) — excludes internal items
+  // because they never reach the client and aren't invoiced.
   const buckets: Record<string, number> = { Unassigned: 0 };
   for (const p of projects) buckets[p.name] = 0;
   for (const it of report.items) {
+    if (it.internal) continue;
     if (it.assignments.length === 0) {
       buckets.Unassigned += it.workedMinutes;
     } else {
@@ -78,6 +84,7 @@ export default async function ReportDetailPage({
       for (const a of it.assignments) buckets[a.project.name] += share;
     }
   }
+  const invoiceableMinutes = totalMinutes - internalMinutes;
 
   return (
     <div className="space-y-6">
@@ -151,6 +158,9 @@ export default async function ReportDetailPage({
 
       <section className="bg-white border border-neutral-200 rounded-lg p-4">
         <h2 className="text-sm font-semibold mb-2">Invoice preview (current assignments)</h2>
+        <p className="text-xs text-neutral-500 mb-2">
+          Internal items are excluded — they never reach the client.
+        </p>
         <table className="w-full text-sm">
           <tbody>
             {Object.entries(buckets).map(([name, mins]) => (
@@ -160,11 +170,17 @@ export default async function ReportDetailPage({
               </tr>
             ))}
             <tr className="border-t-2 border-neutral-200">
-              <td className="py-1.5 font-semibold">Total</td>
+              <td className="py-1.5 font-semibold">Invoiceable total</td>
               <td className="py-1.5 text-right font-semibold">
-                {minutesToHours(totalMinutes)} h
+                {minutesToHours(invoiceableMinutes)} h
               </td>
             </tr>
+            {internalMinutes > 0 && (
+              <tr className="border-t border-neutral-100 text-neutral-500">
+                <td className="py-1.5">Internal (hidden from client)</td>
+                <td className="py-1.5 text-right">{minutesToHours(internalMinutes)} h</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>
