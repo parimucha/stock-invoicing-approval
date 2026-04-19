@@ -5,6 +5,7 @@ import { getJiraBaseUrl } from "@/lib/jira";
 import { reopenReview, saveReviewerNote, signOff } from "./actions";
 import { ReviewItems } from "./ReviewItems";
 import { PendingButton } from "@/components/PendingButton";
+import { HelpButton } from "@/components/HelpButton";
 
 export default async function ReviewPage({
   params,
@@ -52,7 +53,12 @@ export default async function ReviewPage({
                 {minutesToHours(totalMinutes)} h
               </p>
             </div>
-            <StatusBadge status={report.status} />
+            <div className="flex items-center gap-3">
+              <HelpButton title="How to review this report">
+                <ReviewHelpContent />
+              </HelpButton>
+              <StatusBadge status={report.status} />
+            </div>
           </div>
           {locked && (
             <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
@@ -144,6 +150,93 @@ export default async function ReviewPage({
         </section>
       </main>
     </div>
+  );
+}
+
+function ReviewHelpContent() {
+  return (
+    <>
+      <section>
+        <h3 className="font-semibold mb-1">What this is</h3>
+        <p>
+          PORTA prepared this report with all the work done on your account last
+          month. You review each item — approve what&apos;s correct, adjust the
+          project assignment when needed, and sign off when you&apos;re ready.
+          PORTA invoices based on your approval.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold mb-1">Invoice overview (top bar)</h3>
+        <p>
+          Per-project totals based on current assignments. Items assigned to
+          multiple projects are split evenly across them.{" "}
+          <strong>PM share</strong> shows how much of the invoiceable time was
+          project management — it must stay within the 20% cap (green / red
+          indicator). The bar collapses to a one-line summary as you scroll and
+          re-expands at the top.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold mb-1">Item cards</h3>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>
+            The code at the top (e.g.{" "}
+            <code className="bg-neutral-100 px-1 rounded">PCM2-184</code>) is the
+            JIRA ticket — click it to open. Items tagged <strong>PM</strong> are
+            project-management work with no ticket.
+          </li>
+          <li>
+            The green/red bar next to the hours compares worked time against the
+            JIRA estimate. Red means time went over the estimate.
+          </li>
+          <li>
+            A blue <strong>Note from PORTA</strong> box means PORTA added
+            context for this item — read only.
+          </li>
+          <li>
+            <strong>Projects</strong> — tick the project(s) this item should
+            bill to. Multiple ticks split the hours evenly.
+          </li>
+          <li>
+            <strong>Approve / Reject / Pending</strong> — your decision per
+            item, with an optional comment for PORTA.
+          </li>
+        </ul>
+        <p className="mt-2 text-neutral-600">
+          Everything saves automatically as you click or type.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold mb-1">Filter and sort</h3>
+        <p>
+          Above the items: search by key / summary / label, filter by approval
+          status or source (JIRA / PM), and sort by worked hours, over- or
+          under-budget, or JIRA key.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold mb-1">Sign off</h3>
+        <p>
+          When you&apos;re done, hit <strong>Approve report</strong> or{" "}
+          <strong>Reject report</strong> at the bottom. The report locks. If
+          you change your mind, click <strong>Reopen for review</strong> in the
+          same section to unlock and edit again.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold mb-1">Questions?</h3>
+        <p>
+          Leave an <strong>Overall note for PORTA</strong> (above the sign-off
+          buttons) for anything that doesn&apos;t fit a specific item — or
+          reach out to PORTA directly.
+        </p>
+      </section>
+    </>
   );
 }
 
