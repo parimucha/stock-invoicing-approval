@@ -5,7 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { minutesToHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
+import { ConfirmForm } from "@/components/ConfirmForm";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
+import { resetReport } from "./actions";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -131,6 +133,19 @@ export default async function ReportDetailPage({
               </PendingButton>
             </form>
           )}
+          <ConfirmForm
+            action={resetReport}
+            confirmMessage="Reset all review state on this report? Status, approvals, reviewer comments, overall note, and project assignments will revert to the ingest-time defaults. Admin edits (summary renames, merges, PORTA notes) are kept."
+            className="ml-auto"
+          >
+            <input type="hidden" name="id" value={report.id} />
+            <PendingButton
+              className="border border-red-300 text-red-700 rounded px-3 py-1.5 text-sm hover:bg-red-50"
+              pendingLabel="Resetting…"
+            >
+              Reset report
+            </PendingButton>
+          </ConfirmForm>
         </div>
       </section>
 

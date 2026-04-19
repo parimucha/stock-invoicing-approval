@@ -67,6 +67,55 @@ export async function mergeItems(formData: FormData) {
   revalidatePath(`/admin/reports/${reportId}`);
 }
 
+export async function resetReport(formData: FormData) {
+  const reportId = Number(formData.get("id"));
+  if (!reportId) throw new Error("Missing id.");
+
+  const report = await prisma.report.findUnique({
+    where: { id: reportId },
+    include: {
+      items: { select: { id: true, suggestedProjects: true } },
+    },
+  });
+  if (!report) notFound();
+
+  const newAssignments = report.items.flatMap((it) => {
+    const suggestions = (it.suggestedProjects as string[]) ?? [];
+    return suggestions.map((projectId) => ({ itemId: it.id, projectId }));
+  });
+  const itemIds = report.items.map((i) => i.id);
+
+  await prisma.$transaction([
+    prisma.projectAssignment.deleteMany({
+      where: { itemId: { in: itemIds } },
+    }),
+    ...(newAssignments.length > 0
+      ? [
+          prisma.projectAssignment.createMany({
+            data: newAssignments,
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+    prisma.reportItem.updateMany({
+      where: { reportId: report.id },
+      data: { approval: "pending", reviewerComment: null },
+    }),
+    prisma.report.update({
+      where: { id: report.id },
+      data: {
+        status: "draft",
+        sentAt: null,
+        reviewedAt: null,
+        reviewerNote: null,
+      },
+    }),
+  ]);
+
+  revalidatePath(`/admin/reports/${reportId}`);
+  revalidatePath(`/review/${report.magicToken}`);
+}
+
 export async function updatePortaNotes(formData: FormData) {
   const reportId = Number(formData.get("reportId"));
   const itemId = Number(formData.get("itemId"));
