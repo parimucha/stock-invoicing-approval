@@ -43,22 +43,6 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
     setAssignments((prev) => ({ ...prev, [itemId]: next }));
   }, []);
 
-  // The sentinel sits just above the sticky invoice overview. Once it scrolls
-  // out of the viewport, the overview has started sticking and we collapse it
-  // to a one-line summary; scrolling back to the top re-expands it.
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const [overviewCollapsed, setOverviewCollapsed] = useState(false);
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => setOverviewCollapsed(!entry.isIntersecting),
-      { threshold: 0 },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
   const totalMinutes = useMemo(
     () => items.reduce((s, i) => s + i.workedMinutes, 0),
     [items],
@@ -152,17 +136,14 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
   }, [sorted, projects]);
 
   return (
-    <div>
-      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
-      <div className="space-y-6">
-        <InvoiceOverview
-          buckets={buckets}
-          totalMinutes={totalMinutes}
-          pmMinutes={pmMinutes}
-          collapsed={overviewCollapsed}
-        />
+    <div className="space-y-6">
+      <InvoiceOverview
+        buckets={buckets}
+        totalMinutes={totalMinutes}
+        pmMinutes={pmMinutes}
+      />
 
-        <FilterBar
+      <FilterBar
         sort={sort}
         setSort={setSort}
         status={status}
@@ -201,12 +182,11 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
         ),
       )}
 
-        {sorted.length === 0 && (
-          <div className="text-sm text-neutral-500 italic text-center py-8">
-            No items match the current filter.
-          </div>
-        )}
-      </div>
+      {sorted.length === 0 && (
+        <div className="text-sm text-neutral-500 italic text-center py-8">
+          No items match the current filter.
+        </div>
+      )}
     </div>
   );
 }
@@ -215,19 +195,41 @@ function InvoiceOverview({
   buckets,
   totalMinutes,
   pmMinutes,
-  collapsed,
 }: {
   buckets: Record<string, number>;
   totalMinutes: number;
   pmMinutes: number;
-  collapsed: boolean;
 }) {
+  const sectionRef = useRef<HTMLElement>(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Observe the sticky section itself rather than a sibling sentinel. When the
+  // section is being pinned at top:0.5rem (stuck), its top edge sits above a
+  // root whose top has been shrunk by 9px, so intersectionRatio drops below 1.
+  // This avoids the oscillation trap where the sentinel approach interacts
+  // with the browser's scroll anchoring: if the collapse changes the
+  // overview's own height, its top edge stays pinned to top-2 so the observer
+  // stays in "stuck" state and doesn't flip back to expanded.
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setCollapsed(entry.intersectionRatio < 1),
+      { threshold: [1], rootMargin: "-9px 0px 0px 0px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   const pmPct = totalMinutes > 0 ? (pmMinutes / totalMinutes) * 100 : 0;
   const pmOver = pmPct > 20;
 
   if (collapsed) {
     return (
-      <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg shadow-sm">
+      <section
+        ref={sectionRef}
+        className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg shadow-sm"
+      >
         <div className="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
           {Object.entries(buckets).map(([name, mins]) => (
             <span key={name}>
@@ -257,7 +259,10 @@ function InvoiceOverview({
   }
 
   return (
-    <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm">
+    <section
+      ref={sectionRef}
+      className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm"
+    >
       <h2 className="text-lg font-semibold mb-3">Invoice overview</h2>
       <p className="text-sm text-neutral-600 mb-3">
         Hours per project based on current assignments. Items assigned to multiple projects
