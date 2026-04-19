@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { Approval, Project, ReportItem } from "@prisma/client";
 
 import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
+import { JiraLink } from "@/components/JiraLink";
 import { saveItem } from "./actions";
 
 type ItemWithAssignments = ReportItem & {
@@ -109,14 +110,28 @@ export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) 
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <JiraKey jiraKey={item.jiraKey} jiraBaseUrl={jiraBaseUrl} />
+            {item.jiraKey ? (
+              <JiraLink
+                jiraKey={item.jiraKey}
+                jiraBaseUrl={jiraBaseUrl}
+                className="text-xs font-mono bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded px-1.5 py-0.5 hover:underline"
+              />
+            ) : (
+              <span className="text-xs uppercase text-neutral-500">PM</span>
+            )}
             {item.jiraIssuetype && <IssueTypeBadge type={item.jiraIssuetype} />}
             {item.jiraStatus && <JiraStatusBadge status={item.jiraStatus} />}
           </div>
           <div className="mt-1 font-medium">{item.summary}</div>
           {item.parentSummary && (
             <div className="text-xs text-neutral-500">
-              parent: {item.parentKey} {item.parentSummary}
+              parent:{" "}
+              <JiraLink
+                jiraKey={item.parentKey}
+                jiraBaseUrl={jiraBaseUrl}
+                className="font-mono hover:underline"
+              />{" "}
+              {item.parentSummary}
             </div>
           )}
           {(item.jiraLabels as string[]).length > 0 && (
@@ -207,32 +222,6 @@ export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) 
         <SaveIndicator state={saveState} locked={locked} />
       </div>
     </div>
-  );
-}
-
-function JiraKey({
-  jiraKey,
-  jiraBaseUrl,
-}: {
-  jiraKey: string | null;
-  jiraBaseUrl: string | null;
-}) {
-  if (!jiraKey) return <span className="text-xs uppercase text-neutral-500">PM</span>;
-  if (!jiraBaseUrl) {
-    return (
-      <code className="text-xs bg-neutral-100 rounded px-1.5 py-0.5">{jiraKey}</code>
-    );
-  }
-  return (
-    <a
-      href={`${jiraBaseUrl}/browse/${jiraKey}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-xs font-mono bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded px-1.5 py-0.5 hover:underline"
-      title="Open in JIRA"
-    >
-      {jiraKey}
-    </a>
   );
 }
 

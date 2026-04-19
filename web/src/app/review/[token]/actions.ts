@@ -69,6 +69,20 @@ export async function saveReviewerNote(formData: FormData) {
   revalidatePath(`/admin/reports/${report.id}`);
 }
 
+export async function reopenReview(formData: FormData) {
+  const token = String(formData.get("token"));
+  const report = await loadReport(token);
+  if (!isLocked(report.status)) {
+    throw new Error("Report is not locked.");
+  }
+  await prisma.report.update({
+    where: { id: report.id },
+    data: { status: "under_review", reviewedAt: null },
+  });
+  revalidatePath(`/review/${token}`);
+  revalidatePath(`/admin/reports/${report.id}`);
+}
+
 export async function signOff(formData: FormData) {
   const token = String(formData.get("token"));
   const decision = String(formData.get("decision"));

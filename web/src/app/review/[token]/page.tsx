@@ -1,14 +1,10 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { minutesToHours } from "@/lib/format";
-import { saveReviewerNote, signOff } from "./actions";
-import { ItemCard } from "./ItemCard";
+import { getJiraBaseUrl } from "@/lib/jira";
+import { reopenReview, saveReviewerNote, signOff } from "./actions";
+import { ReviewItems } from "./ReviewItems";
 import { PendingButton } from "@/components/PendingButton";
-import type { ReportItem } from "@prisma/client";
-
-type ItemWithAssignments = ReportItem & {
-  assignments: { projectId: string }[];
-};
 
 export default async function ReviewPage({
   params,
@@ -40,24 +36,7 @@ export default async function ReviewPage({
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
   const locked = report.status === "approved" || report.status === "rejected";
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
-  const jiraBaseUrl = process.env.JIRA_BASE_URL?.replace(/\/+$/, "") || null;
-
-  // Group items by the INGEST-TIME suggestion so cards stay put while the
-  // reviewer edits assignments. The invoice overview below uses the current
-  // assignments and updates live after each autosave.
-  const groups: { name: string; items: ItemWithAssignments[] }[] = [];
-  const order = [...projects.map((p) => p.name), "Unassigned"];
-  for (const name of order) groups.push({ name, items: [] });
-  const byName = new Map(groups.map((g) => [g.name, g] as const));
-  for (const it of report.items) {
-    const suggested = it.suggestedProjects as string[];
-    const firstProjectName =
-      suggested.length === 0
-        ? "Unassigned"
-        : (projects.find((p) => p.id === suggested[0])?.name ?? "Unassigned");
-    const bucket = byName.get(firstProjectName) ?? byName.get("Unassigned")!;
-    bucket.items.push(it);
-  }
+  const jiraBaseUrl = getJiraBaseUrl();
 
   // Invoice preview, even-split.
   const buckets: Record<string, number> = { Unassigned: 0 };
@@ -100,27 +79,13 @@ export default async function ReviewPage({
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-8">
         <InvoiceOverview buckets={buckets} totalMinutes={totalMinutes} />
 
-        {groups.map((g) =>
-          g.items.length === 0 ? null : (
-            <section key={g.name} className="space-y-3">
-              <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide">
-                {g.name} · {minutesToHours(g.items.reduce((s, i) => s + i.workedMinutes, 0))} h
-              </h2>
-              <div className="space-y-3">
-                {g.items.map((it) => (
-                  <ItemCard
-                    key={it.id}
-                    item={it}
-                    token={token}
-                    projects={projects}
-                    locked={locked}
-                    jiraBaseUrl={jiraBaseUrl}
-                  />
-                ))}
-              </div>
-            </section>
-          ),
-        )}
+        <ReviewItems
+          items={report.items}
+          projects={projects}
+          token={token}
+          locked={locked}
+          jiraBaseUrl={jiraBaseUrl}
+        />
 
         {!locked && (
           <section className="bg-white border border-neutral-200 rounded-lg p-5 space-y-4">
@@ -147,10 +112,24 @@ export default async function ReviewPage({
         <section className="bg-white border border-neutral-200 rounded-lg p-5 space-y-3">
           <h2 className="text-lg font-semibold">Sign off</h2>
           {locked ? (
-            <p className="text-sm">
-              You have {report.status} this report on{" "}
-              {report.reviewedAt?.toLocaleString() ?? "—"}.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm">
+                You have {report.status} this report on{" "}
+                {report.reviewedAt?.toLocaleString() ?? "—"}.
+              </p>
+              <form action={reopenReview}>
+                <input type="hidden" name="token" value={token} />
+                <PendingButton
+                  className="border border-neutral-300 rounded px-3 py-1.5 text-sm hover:bg-neutral-50"
+                  pendingLabel="Reopening…"
+                >
+                  Reopen for review
+                </PendingButton>
+                <p className="text-xs text-neutral-500 mt-1.5">
+                  Undo your sign-off and continue editing. Your item decisions are kept.
+                </p>
+              </form>
+            </div>
           ) : (
             <div className="flex flex-wrap gap-3">
               <form action={signOff}>

@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
+import { getJiraBaseUrl } from "@/lib/jira";
+import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
 
 async function markSent(formData: FormData) {
@@ -46,6 +48,7 @@ export default async function ReportDetailPage({
   if (!report) notFound();
 
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
+  const jiraBaseUrl = getJiraBaseUrl();
 
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
@@ -161,7 +164,15 @@ export default async function ReportDetailPage({
             {report.items.map((it) => (
               <tr key={it.id} className="border-t border-neutral-100 align-top">
                 <td className="px-3 py-2 font-mono text-xs">
-                  {it.jiraKey ?? <span className="text-neutral-400">PM</span>}
+                  {it.jiraKey ? (
+                    <JiraLink
+                      jiraKey={it.jiraKey}
+                      jiraBaseUrl={jiraBaseUrl}
+                      className="hover:underline"
+                    />
+                  ) : (
+                    <span className="text-neutral-400">PM</span>
+                  )}
                 </td>
                 <td className="px-3 py-2">
                   {it.jiraIssuetype && <IssueTypeBadge type={it.jiraIssuetype} />}
@@ -170,7 +181,13 @@ export default async function ReportDetailPage({
                   <div>{it.summary}</div>
                   {it.parentSummary && (
                     <div className="text-xs text-neutral-500">
-                      parent: {it.parentKey} {it.parentSummary}
+                      parent:{" "}
+                      <JiraLink
+                        jiraKey={it.parentKey}
+                        jiraBaseUrl={jiraBaseUrl}
+                        className="font-mono hover:underline"
+                      />{" "}
+                      {it.parentSummary}
                     </div>
                   )}
                 </td>
