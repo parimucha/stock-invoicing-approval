@@ -5,6 +5,7 @@ import { getJiraBaseUrl } from "@/lib/jira";
 import { reopenReview, saveReviewerNote, signOff } from "./actions";
 import { ReviewItems } from "./ReviewItems";
 import { PendingButton } from "@/components/PendingButton";
+import { PmShareIndicator } from "@/components/PmShareIndicator";
 
 export default async function ReviewPage({
   params,
@@ -37,6 +38,10 @@ export default async function ReviewPage({
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
   const locked = report.status === "approved" || report.status === "rejected";
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
+  const pmMinutes = report.items.reduce(
+    (s, i) => (i.source === "project_management" ? s + i.workedMinutes : s),
+    0,
+  );
   const jiraBaseUrl = getJiraBaseUrl();
 
   // Invoice preview, even-split.
@@ -78,7 +83,11 @@ export default async function ReviewPage({
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 space-y-8">
-        <InvoiceOverview buckets={buckets} totalMinutes={totalMinutes} />
+        <InvoiceOverview
+          buckets={buckets}
+          totalMinutes={totalMinutes}
+          pmMinutes={pmMinutes}
+        />
 
         <ReviewItems
           items={report.items}
@@ -167,9 +176,11 @@ export default async function ReviewPage({
 function InvoiceOverview({
   buckets,
   totalMinutes,
+  pmMinutes,
 }: {
   buckets: Record<string, number>;
   totalMinutes: number;
+  pmMinutes: number;
 }) {
   return (
     <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm">
@@ -192,6 +203,9 @@ function InvoiceOverview({
           </tr>
         </tbody>
       </table>
+      <div className="mt-3 pt-3 border-t border-neutral-200">
+        <PmShareIndicator pmMinutes={pmMinutes} invoiceableMinutes={totalMinutes} />
+      </div>
     </section>
   );
 }

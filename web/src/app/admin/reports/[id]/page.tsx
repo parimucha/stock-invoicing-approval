@@ -6,6 +6,7 @@ import { minutesToHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmForm } from "@/components/ConfirmForm";
+import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
 import { resetReport } from "./actions";
 
@@ -68,6 +69,11 @@ export default async function ReportDetailPage({
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
   const internalMinutes = report.items.reduce(
     (s, i) => (i.internal ? s + i.workedMinutes : s),
+    0,
+  );
+  const pmMinutes = report.items.reduce(
+    (s, i) =>
+      !i.internal && i.source === "project_management" ? s + i.workedMinutes : s,
     0,
   );
 
@@ -183,6 +189,12 @@ export default async function ReportDetailPage({
             )}
           </tbody>
         </table>
+        <div className="mt-4 pt-3 border-t border-neutral-200">
+          <PmShareIndicator
+            pmMinutes={pmMinutes}
+            invoiceableMinutes={invoiceableMinutes}
+          />
+        </div>
       </section>
 
       <AdminItemsTable
