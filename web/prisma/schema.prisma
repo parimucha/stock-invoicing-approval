@@ -65,6 +65,7 @@ model ReportItem {
   parentKey         String?
   parentSummary     String?
   pmNotes           String?     @db.Text
+  portaNotes        String?     @db.Text
   suggestedProjects Json
   approval          Approval    @default(pending)
   reviewerComment   String?     @db.Text

@@ -67,6 +67,25 @@ export async function mergeItems(formData: FormData) {
   revalidatePath(`/admin/reports/${reportId}`);
 }
 
+export async function updatePortaNotes(formData: FormData) {
+  const reportId = Number(formData.get("reportId"));
+  const itemId = Number(formData.get("itemId"));
+  const notes = String(formData.get("portaNotes") ?? "").trim();
+  if (!reportId || !itemId) throw new Error("Missing ids.");
+
+  const report = await loadDraftReport(reportId);
+
+  const item = await prisma.reportItem.findUnique({ where: { id: itemId } });
+  if (!item || item.reportId !== report.id) notFound();
+
+  await prisma.reportItem.update({
+    where: { id: itemId },
+    data: { portaNotes: notes || null },
+  });
+
+  revalidatePath(`/admin/reports/${reportId}`);
+}
+
 export async function updateItemSummary(formData: FormData) {
   const reportId = Number(formData.get("reportId"));
   const itemId = Number(formData.get("itemId"));

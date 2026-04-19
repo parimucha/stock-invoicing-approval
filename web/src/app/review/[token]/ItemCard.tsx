@@ -165,6 +165,15 @@ export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) 
         </div>
       </div>
 
+      {item.portaNotes && (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          <div className="text-xs font-semibold uppercase tracking-wide text-blue-700 mb-0.5">
+            Note from PORTA
+          </div>
+          <div className="whitespace-pre-wrap">{item.portaNotes}</div>
+        </div>
+      )}
+
       {item.pmNotes && (
         <details className="text-xs text-neutral-600">
           <summary className="cursor-pointer">PM notes</summary>

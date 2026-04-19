@@ -7,7 +7,7 @@ import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
-import { mergeItems, updateItemSummary } from "./actions";
+import { mergeItems, updateItemSummary, updatePortaNotes } from "./actions";
 
 export type MergeTarget = { id: number; label: string; isJira: boolean };
 
@@ -119,7 +119,8 @@ export function AdminItemsTable({
           </thead>
           <tbody>
             {sorted.map((it) => {
-              const canEdit = editable && it.source === "project_management";
+              const canEdit = editable;
+              const isPm = it.source === "project_management";
               return (
                 <Fragment key={it.id}>
                   <tr className="border-t border-neutral-100 align-top">
@@ -148,6 +149,11 @@ export function AdminItemsTable({
                             className="font-mono hover:underline"
                           />{" "}
                           {it.parentSummary}
+                        </div>
+                      )}
+                      {it.portaNotes && (
+                        <div className="mt-1 text-xs rounded border border-blue-200 bg-blue-50 px-2 py-1 text-blue-900 whitespace-pre-wrap">
+                          <span className="font-semibold">PORTA:</span> {it.portaNotes}
                         </div>
                       )}
                     </td>
@@ -197,10 +203,12 @@ export function AdminItemsTable({
                   {canEdit && (
                     <tr className="edit-row bg-neutral-50 border-t border-neutral-100">
                       <td colSpan={colCount} className="px-4 py-3">
-                        <PmEditPanel
+                        <EditPanel
                           reportId={reportId}
                           itemId={it.id}
                           summary={it.summary}
+                          portaNotes={it.portaNotes}
+                          isPm={isPm}
                           targets={mergeTargets.filter((t) => t.id !== it.id)}
                         />
                       </td>
@@ -348,82 +356,114 @@ function PillGroup<T extends string>({
   );
 }
 
-function PmEditPanel({
+function EditPanel({
   reportId,
   itemId,
   summary,
+  portaNotes,
+  isPm,
   targets,
 }: {
   reportId: number;
   itemId: number;
   summary: string;
+  portaNotes: string | null;
+  isPm: boolean;
   targets: MergeTarget[];
 }) {
   const jiraTargets = targets.filter((t) => t.isJira);
   const pmTargets = targets.filter((t) => !t.isJira);
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <form action={updateItemSummary} className="space-y-1.5">
+    <div className="space-y-4">
+      <form action={updatePortaNotes} className="space-y-1.5">
         <input type="hidden" name="reportId" value={reportId} />
         <input type="hidden" name="itemId" value={itemId} />
-        <label className="block text-xs font-medium text-neutral-600">Summary</label>
-        <input
-          name="summary"
-          defaultValue={summary}
-          required
+        <label className="block text-xs font-medium text-neutral-600">
+          PORTA notes
+          <span className="ml-1 font-normal text-neutral-500">
+            — shown to Stock on the review card (read-only)
+          </span>
+        </label>
+        <textarea
+          name="portaNotes"
+          defaultValue={portaNotes ?? ""}
+          rows={3}
           className="w-full text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
+          placeholder="Context for the client about this item…"
         />
         <PendingButton
           className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
           pendingLabel="Saving…"
         >
-          Save summary
+          Save notes
         </PendingButton>
       </form>
 
-      {targets.length > 0 && (
-        <form action={mergeItems} className="space-y-1.5">
-          <input type="hidden" name="reportId" value={reportId} />
-          <input type="hidden" name="sourceId" value={itemId} />
-          <label className="block text-xs font-medium text-neutral-600">Merge into…</label>
-          <select
-            name="targetId"
-            required
-            defaultValue=""
-            className="w-full text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
-          >
-            <option value="" disabled>
-              Pick a target…
-            </option>
-            {jiraTargets.length > 0 && (
-              <optgroup label="JIRA items">
-                {jiraTargets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {pmTargets.length > 0 && (
-              <optgroup label="PM items">
-                {pmTargets.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.label}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-          <p className="text-xs text-neutral-500">
-            Minutes sum into the target; this row&apos;s notes are appended and the row is removed.
-          </p>
-          <PendingButton
-            className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
-            pendingLabel="Merging…"
-          >
-            Merge
-          </PendingButton>
-        </form>
+      {isPm && (
+        <div className="grid gap-6 md:grid-cols-2 pt-3 border-t border-neutral-200">
+          <form action={updateItemSummary} className="space-y-1.5">
+            <input type="hidden" name="reportId" value={reportId} />
+            <input type="hidden" name="itemId" value={itemId} />
+            <label className="block text-xs font-medium text-neutral-600">Summary</label>
+            <input
+              name="summary"
+              defaultValue={summary}
+              required
+              className="w-full text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
+            />
+            <PendingButton
+              className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
+              pendingLabel="Saving…"
+            >
+              Save summary
+            </PendingButton>
+          </form>
+
+          {targets.length > 0 && (
+            <form action={mergeItems} className="space-y-1.5">
+              <input type="hidden" name="reportId" value={reportId} />
+              <input type="hidden" name="sourceId" value={itemId} />
+              <label className="block text-xs font-medium text-neutral-600">Merge into…</label>
+              <select
+                name="targetId"
+                required
+                defaultValue=""
+                className="w-full text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
+              >
+                <option value="" disabled>
+                  Pick a target…
+                </option>
+                {jiraTargets.length > 0 && (
+                  <optgroup label="JIRA items">
+                    {jiraTargets.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {pmTargets.length > 0 && (
+                  <optgroup label="PM items">
+                    {pmTargets.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              <p className="text-xs text-neutral-500">
+                Minutes sum into the target; this row&apos;s notes are appended and the row is removed.
+              </p>
+              <PendingButton
+                className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
+                pendingLabel="Merging…"
+              >
+                Merge
+              </PendingButton>
+            </form>
+          )}
+        </div>
       )}
     </div>
   );
