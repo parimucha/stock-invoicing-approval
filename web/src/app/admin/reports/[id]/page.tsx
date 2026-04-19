@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
+import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
 
@@ -191,7 +192,14 @@ export default async function ReportDetailPage({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-2 text-right">{minutesToHours(it.workedMinutes)}</td>
+                <td className="px-3 py-2 text-right">
+                  <div>{minutesToHours(it.workedMinutes)}</div>
+                  <BudgetBar
+                    workedMinutes={it.workedMinutes}
+                    estimatedSeconds={it.estimatedSeconds}
+                    className="mt-1 w-24 ml-auto"
+                  />
+                </td>
                 <td className="px-3 py-2 text-right">{secondsToHours(it.estimatedSeconds)}</td>
                 <td className="px-3 py-2 text-right">
                   {diffHours(it.estimatedSeconds, it.workedMinutes)}

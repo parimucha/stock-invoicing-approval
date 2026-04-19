@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import type { Approval, Project, ReportItem } from "@prisma/client";
 
 import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
+import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { saveItem } from "./actions";
 
@@ -139,7 +140,7 @@ export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) 
               {(item.jiraLabels as string[]).map((l) => (
                 <span
                   key={l}
-                  className="text-[10px] bg-neutral-100 text-neutral-600 rounded px-1.5 py-0.5"
+                  className="text-xs bg-neutral-100 text-neutral-600 rounded px-1.5 py-0.5"
                 >
                   {l}
                 </span>
@@ -148,9 +149,16 @@ export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) 
           )}
         </div>
 
-        <div className="text-right text-sm shrink-0">
-          <div className="font-semibold">{minutesToHours(item.workedMinutes)} h worked</div>
-          <div className="text-xs text-neutral-500">
+        <div className="text-right text-sm shrink-0 w-44 md:w-52">
+          <div className="font-semibold whitespace-nowrap">
+            {minutesToHours(item.workedMinutes)} h worked
+          </div>
+          <BudgetBar
+            workedMinutes={item.workedMinutes}
+            estimatedSeconds={item.estimatedSeconds}
+            className="mt-1.5"
+          />
+          <div className="text-xs text-neutral-500 mt-1 whitespace-nowrap">
             est {secondsToHours(item.estimatedSeconds)} · Δ{" "}
             {diffHours(item.estimatedSeconds, item.workedMinutes)}
           </div>
