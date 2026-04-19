@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Project, ReportItem } from "@prisma/client";
 
 import { minutesToHours } from "@/lib/format";
+import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { ItemCard } from "./ItemCard";
 
 type ItemWithAssignments = ReportItem & {
@@ -27,6 +28,50 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<SourceFilter>("all");
   const [query, setQuery] = useState("");
+
+  // Assignments are hoisted here so the invoice overview stays live without a
+  // server round-trip on every autosave. ItemCard becomes a controlled input.
+  const [assignments, setAssignments] = useState<Record<number, string[]>>(() => {
+    const map: Record<number, string[]> = {};
+    for (const it of items) {
+      map[it.id] = [...it.assignments.map((a) => a.projectId)].sort();
+    }
+    return map;
+  });
+
+  const setItemAssignments = useCallback((itemId: number, next: string[]) => {
+    setAssignments((prev) => ({ ...prev, [itemId]: next }));
+  }, []);
+
+  const totalMinutes = useMemo(
+    () => items.reduce((s, i) => s + i.workedMinutes, 0),
+    [items],
+  );
+  const pmMinutes = useMemo(
+    () =>
+      items.reduce(
+        (s, i) => (i.source === "project_management" ? s + i.workedMinutes : s),
+        0,
+      ),
+    [items],
+  );
+  const buckets = useMemo(() => {
+    const b: Record<string, number> = { Unassigned: 0 };
+    for (const p of projects) b[p.name] = 0;
+    for (const it of items) {
+      const assigned = assignments[it.id] ?? [];
+      if (assigned.length === 0) {
+        b.Unassigned += it.workedMinutes;
+      } else {
+        const share = it.workedMinutes / assigned.length;
+        for (const pid of assigned) {
+          const p = projects.find((x) => x.id === pid);
+          if (p) b[p.name] += share;
+        }
+      }
+    }
+    return b;
+  }, [items, assignments, projects]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -92,6 +137,12 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
 
   return (
     <div className="space-y-6">
+      <InvoiceOverview
+        buckets={buckets}
+        totalMinutes={totalMinutes}
+        pmMinutes={pmMinutes}
+      />
+
       <FilterBar
         sort={sort}
         setSort={setSort}
@@ -122,6 +173,8 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
                   projects={projects}
                   locked={locked}
                   jiraBaseUrl={jiraBaseUrl}
+                  assigned={assignments[it.id] ?? []}
+                  onAssignedChange={(next) => setItemAssignments(it.id, next)}
                 />
               ))}
             </div>
@@ -135,6 +188,43 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
         </div>
       )}
     </div>
+  );
+}
+
+function InvoiceOverview({
+  buckets,
+  totalMinutes,
+  pmMinutes,
+}: {
+  buckets: Record<string, number>;
+  totalMinutes: number;
+  pmMinutes: number;
+}) {
+  return (
+    <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm">
+      <h2 className="text-lg font-semibold mb-3">Invoice overview</h2>
+      <p className="text-sm text-neutral-600 mb-3">
+        Hours per project based on current assignments. Items assigned to multiple projects
+        are split evenly.
+      </p>
+      <table className="w-full text-sm">
+        <tbody>
+          {Object.entries(buckets).map(([name, mins]) => (
+            <tr key={name} className="border-t border-neutral-100 first:border-t-0">
+              <td className="py-2 text-neutral-700">{name}</td>
+              <td className="py-2 text-right font-medium">{minutesToHours(mins)} h</td>
+            </tr>
+          ))}
+          <tr className="border-t-2 border-neutral-200">
+            <td className="py-2 font-semibold">Total</td>
+            <td className="py-2 text-right font-semibold">{minutesToHours(totalMinutes)} h</td>
+          </tr>
+        </tbody>
+      </table>
+      <div className="mt-3 pt-3 border-t border-neutral-200">
+        <PmShareIndicator pmMinutes={pmMinutes} invoiceableMinutes={totalMinutes} />
+      </div>
+    </section>
   );
 }
 

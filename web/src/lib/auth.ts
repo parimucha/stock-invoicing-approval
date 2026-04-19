@@ -39,10 +39,19 @@ export async function isAdmin(): Promise<boolean> {
   return age >= 0 && age < MAX_AGE;
 }
 
+export async function requireAdmin(): Promise<void> {
+  if (!(await isAdmin())) {
+    throw new Error("Unauthorized");
+  }
+}
+
 export async function signInAdmin(password: string): Promise<boolean> {
   const expected = process.env.ADMIN_PASSWORD;
   if (!expected) throw new Error("ADMIN_PASSWORD not set");
-  if (password !== expected) return false;
+  const a = Buffer.from(password);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  if (!timingSafeEqual(a, b)) return false;
   const payload = `admin:${Math.floor(Date.now() / 1000)}`;
   const cookie = sign(payload);
   const jar = await cookies();

@@ -18,6 +18,8 @@ type Props = {
   projects: Project[];
   locked: boolean;
   jiraBaseUrl: string | null;
+  assigned: string[];
+  onAssignedChange: (next: string[]) => void;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -31,10 +33,15 @@ const APPROVAL_CARD_STYLES: Record<Approval, string> = {
   pending: "border-neutral-200 bg-white",
 };
 
-export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) {
-  const [assigned, setAssigned] = useState<string[]>(() =>
-    [...item.assignments.map((a) => a.projectId)].sort(),
-  );
+export function ItemCard({
+  item,
+  token,
+  projects,
+  locked,
+  jiraBaseUrl,
+  assigned,
+  onAssignedChange,
+}: Props) {
   const [comment, setComment] = useState(item.reviewerComment ?? "");
   const [approval, setApproval] = useState<Approval>(item.approval);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -94,12 +101,10 @@ export function ItemCard({ item, token, projects, locked, jiraBaseUrl }: Props) 
   }, []);
 
   function toggleProject(id: string, on: boolean) {
-    setAssigned((prev) => {
-      const next = new Set(prev);
-      if (on) next.add(id);
-      else next.delete(id);
-      return [...next].sort();
-    });
+    const next = new Set(assigned);
+    if (on) next.add(id);
+    else next.delete(id);
+    onAssignedChange([...next].sort());
     schedule();
   }
 

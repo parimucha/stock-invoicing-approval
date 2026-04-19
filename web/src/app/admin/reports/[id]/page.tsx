@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 import { minutesToHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
@@ -12,6 +13,7 @@ import { resetReport } from "./actions";
 
 async function markSent(formData: FormData) {
   "use server";
+  await requireAdmin();
   const id = Number(formData.get("id"));
   await prisma.report.update({
     where: { id },
@@ -22,6 +24,7 @@ async function markSent(formData: FormData) {
 
 async function reopen(formData: FormData) {
   "use server";
+  await requireAdmin();
   const id = Number(formData.get("id"));
   await prisma.report.update({
     where: { id },

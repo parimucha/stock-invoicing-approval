@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { parseUploadReport } from "@/lib/report-schema";
-import { newMagicToken } from "@/lib/auth";
+import { newMagicToken, requireAdmin } from "@/lib/auth";
 import { PendingButton } from "@/components/PendingButton";
 
 async function uploadReport(formData: FormData) {
   "use server";
+  await requireAdmin();
 
   const file = formData.get("file");
   const pasted = String(formData.get("json") ?? "").trim();

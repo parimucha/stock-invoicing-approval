@@ -3,8 +3,10 @@
 import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth";
 
 async function loadDraftReport(reportId: number) {
+  await requireAdmin();
   const report = await prisma.report.findUnique({ where: { id: reportId } });
   if (!report) notFound();
   if (report.status !== "draft") {
@@ -68,6 +70,7 @@ export async function mergeItems(formData: FormData) {
 }
 
 export async function resetReport(formData: FormData) {
+  await requireAdmin();
   const reportId = Number(formData.get("id"));
   if (!reportId) throw new Error("Missing id.");
 

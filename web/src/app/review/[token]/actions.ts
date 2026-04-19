@@ -51,8 +51,9 @@ export async function saveItem(formData: FormData) {
     }),
   ]);
   await ensureUnderReview(report.id, report.status);
-  revalidatePath(`/review/${token}`);
-  revalidatePath(`/admin/reports/${report.id}`);
+  // No revalidatePath on the hot autosave path — the reviewer's UI already
+  // reflects the save via client state, and the server data is re-fetched on
+  // the next navigation or refresh.
 }
 
 export async function saveReviewerNote(formData: FormData) {
@@ -65,8 +66,6 @@ export async function saveReviewerNote(formData: FormData) {
     data: { reviewerNote: note || null },
   });
   await ensureUnderReview(report.id, report.status);
-  revalidatePath(`/review/${token}`);
-  revalidatePath(`/admin/reports/${report.id}`);
 }
 
 export async function reopenReview(formData: FormData) {
