@@ -7,6 +7,7 @@ import { getJiraBaseUrl } from "@/lib/jira";
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
+import { mergeItems, updateItemSummary } from "./actions";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -50,6 +51,12 @@ export default async function ReportDetailPage({
 
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
   const jiraBaseUrl = getJiraBaseUrl();
+  const editable = report.status === "draft";
+  const mergeTargets = report.items.map((it) => ({
+    id: it.id,
+    label: it.jiraKey ? `${it.jiraKey} — ${truncate(it.summary, 70)}` : `PM — ${truncate(it.summary, 70)}`,
+    isJira: Boolean(it.jiraKey),
+  }));
 
   const h = await headers();
   const host = h.get("host") ?? "localhost:3000";
@@ -113,7 +120,7 @@ export default async function ReportDetailPage({
               </PendingButton>
             </form>
           )}
-          {(report.status === "sent" || report.status === "under_review") && (
+          {report.status !== "draft" && (
             <form action={reopen}>
               <input type="hidden" name="id" value={report.id} />
               <PendingButton
@@ -159,6 +166,7 @@ export default async function ReportDetailPage({
               <th className="text-right px-3 py-2 font-medium">Δ</th>
               <th className="text-left px-3 py-2 font-medium">Projects</th>
               <th className="text-left px-3 py-2 font-medium">Approval</th>
+              {editable && <th className="text-left px-3 py-2 font-medium">Edit</th>}
             </tr>
           </thead>
           <tbody>
@@ -219,6 +227,18 @@ export default async function ReportDetailPage({
                     </div>
                   )}
                 </td>
+                {editable && (
+                  <td className="px-3 py-2 align-top">
+                    {it.source === "project_management" ? (
+                      <PmEditCell
+                        reportId={report.id}
+                        itemId={it.id}
+                        summary={it.summary}
+                        targets={mergeTargets.filter((t) => t.id !== it.id)}
+                      />
+                    ) : null}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -249,6 +269,101 @@ function IssueTypeBadge({ type }: { type: string }) {
       {type}
     </span>
   );
+}
+
+type MergeTarget = { id: number; label: string; isJira: boolean };
+
+function PmEditCell({
+  reportId,
+  itemId,
+  summary,
+  targets,
+}: {
+  reportId: number;
+  itemId: number;
+  summary: string;
+  targets: MergeTarget[];
+}) {
+  const jiraTargets = targets.filter((t) => t.isJira);
+  const pmTargets = targets.filter((t) => !t.isJira);
+  return (
+    <details className="group">
+      <summary className="cursor-pointer list-none text-xs text-neutral-700 hover:text-neutral-900 select-none">
+        <span className="inline-block rounded border border-neutral-300 bg-white px-2 py-0.5 group-open:bg-neutral-900 group-open:text-white group-open:border-neutral-900">
+          Edit
+        </span>
+      </summary>
+      <div className="mt-2 space-y-3 w-72">
+        <form action={updateItemSummary} className="space-y-1">
+          <input type="hidden" name="reportId" value={reportId} />
+          <input type="hidden" name="itemId" value={itemId} />
+          <label className="block text-xs text-neutral-600">Summary</label>
+          <input
+            name="summary"
+            defaultValue={summary}
+            required
+            className="w-full text-xs border border-neutral-300 rounded px-2 py-1"
+          />
+          <PendingButton
+            className="text-xs border border-neutral-300 rounded px-2 py-0.5 hover:bg-neutral-50"
+            pendingLabel="Saving…"
+          >
+            Save summary
+          </PendingButton>
+        </form>
+
+        {targets.length > 0 && (
+          <form action={mergeItems} className="space-y-1">
+            <input type="hidden" name="reportId" value={reportId} />
+            <input type="hidden" name="sourceId" value={itemId} />
+            <label className="block text-xs text-neutral-600">Merge into…</label>
+            <select
+              name="targetId"
+              required
+              defaultValue=""
+              className="w-full text-xs border border-neutral-300 rounded px-2 py-1"
+            >
+              <option value="" disabled>
+                Pick a target…
+              </option>
+              {jiraTargets.length > 0 && (
+                <optgroup label="JIRA items">
+                  {jiraTargets.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {pmTargets.length > 0 && (
+                <optgroup label="PM items">
+                  {pmTargets.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <p className="text-xs text-neutral-500">
+              Minutes sum into the target; this row&apos;s notes are appended and the row is removed.
+            </p>
+            <PendingButton
+              className="text-xs border border-neutral-300 rounded px-2 py-0.5 hover:bg-neutral-50"
+              pendingLabel="Merging…"
+            >
+              Merge
+            </PendingButton>
+          </form>
+        )}
+      </div>
+    </details>
+  );
+}
+
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max - 1).trimEnd() + "…";
 }
 
 function ApprovalBadge({ approval }: { approval: string }) {
