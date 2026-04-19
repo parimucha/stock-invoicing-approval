@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project, ReportItem } from "@prisma/client";
 
 import { minutesToHours } from "@/lib/format";
@@ -41,6 +41,22 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
 
   const setItemAssignments = useCallback((itemId: number, next: string[]) => {
     setAssignments((prev) => ({ ...prev, [itemId]: next }));
+  }, []);
+
+  // The sentinel sits just above the sticky invoice overview. Once it scrolls
+  // out of the viewport, the overview has started sticking and we collapse it
+  // to a one-line summary; scrolling back to the top re-expands it.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const [overviewCollapsed, setOverviewCollapsed] = useState(false);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setOverviewCollapsed(!entry.isIntersecting),
+      { threshold: 0 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
   }, []);
 
   const totalMinutes = useMemo(
@@ -136,14 +152,17 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
   }, [sorted, projects]);
 
   return (
-    <div className="space-y-6">
-      <InvoiceOverview
-        buckets={buckets}
-        totalMinutes={totalMinutes}
-        pmMinutes={pmMinutes}
-      />
+    <div>
+      <div ref={sentinelRef} aria-hidden="true" className="h-px" />
+      <div className="space-y-6">
+        <InvoiceOverview
+          buckets={buckets}
+          totalMinutes={totalMinutes}
+          pmMinutes={pmMinutes}
+          collapsed={overviewCollapsed}
+        />
 
-      <FilterBar
+        <FilterBar
         sort={sort}
         setSort={setSort}
         status={status}
@@ -182,11 +201,12 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
         ),
       )}
 
-      {sorted.length === 0 && (
-        <div className="text-sm text-neutral-500 italic text-center py-8">
-          No items match the current filter.
-        </div>
-      )}
+        {sorted.length === 0 && (
+          <div className="text-sm text-neutral-500 italic text-center py-8">
+            No items match the current filter.
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -195,11 +215,47 @@ function InvoiceOverview({
   buckets,
   totalMinutes,
   pmMinutes,
+  collapsed,
 }: {
   buckets: Record<string, number>;
   totalMinutes: number;
   pmMinutes: number;
+  collapsed: boolean;
 }) {
+  const pmPct = totalMinutes > 0 ? (pmMinutes / totalMinutes) * 100 : 0;
+  const pmOver = pmPct > 20;
+
+  if (collapsed) {
+    return (
+      <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg shadow-sm">
+        <div className="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+          {Object.entries(buckets).map(([name, mins]) => (
+            <span key={name}>
+              <span className="text-neutral-500">{name}</span>{" "}
+              <span className="font-medium text-neutral-800">
+                {minutesToHours(mins)} h
+              </span>
+            </span>
+          ))}
+          <span className="text-neutral-300" aria-hidden="true">
+            ·
+          </span>
+          <span
+            className={`font-medium ${pmOver ? "text-red-700" : "text-green-700"}`}
+          >
+            PM {pmPct.toFixed(1)}% {pmOver ? "⚠" : "✓"}
+          </span>
+          <span className="text-neutral-300" aria-hidden="true">
+            ·
+          </span>
+          <span className="font-semibold">
+            Total {minutesToHours(totalMinutes)} h
+          </span>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm">
       <h2 className="text-lg font-semibold mb-3">Invoice overview</h2>
