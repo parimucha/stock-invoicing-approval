@@ -80,8 +80,9 @@ Writes `data/<YYYY-MM>/report.json`. The script:
 - Groups entries by `jira_key` (JIRA items) or by normalized Productive note
   (PM items — no JIRA link).
 - Applies the project-mapping rules: `SAPS-*` → SAP Spirit; parent `PCM2-91`
-  → Czech Pimcore, `PCM2-92` → French Pimcore; label `CZ` / `France` as a
-  fallback. Other parents / labels (Slovak, General) stay Unassigned.
+  → Czech Pimcore, `PCM2-92` → French Pimcore, `PCM2-229` → German Pimcore;
+  label `CZ` / `France` / `GER` as a fallback. Other parents / labels
+  (Slovak, General) stay Unassigned.
 - Sums worked minutes, emits `suggested_projects`, and sorts items by worked
   time descending.
 

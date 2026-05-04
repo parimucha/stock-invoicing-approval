@@ -69,11 +69,13 @@ label matches can stack.
 2. Parent issue:
    - `PCM2-91` (PIM CZ) → Czech Pimcore
    - `PCM2-92` (PIM FR) → French Pimcore
-   - `PCM2-124` (PIM SK) → Unassigned (Slovak isn't one of the three)
+   - `PCM2-229` (PIM DE) → German Pimcore
+   - `PCM2-124` (PIM SK) → Unassigned (Slovak isn't one of the projects)
    - any other parent → skip, go to labels
 3. Labels (weak fallback):
    - `CZ` → Czech Pimcore
    - `France` → French Pimcore
+   - `GER` → German Pimcore
    - `SAP` is intentionally **not** a project indicator (it's cross-cutting)
 4. PM items always start Unassigned. The Productive service suffix may be
    surfaced as a hint, but the reviewer does the assignment.

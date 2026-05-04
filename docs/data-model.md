@@ -9,13 +9,14 @@ All persistent state lives in five tables defined in
 
 Fixed list, seeded by [`web/prisma/seed.ts`](../web/prisma/seed.ts):
 
-| id              | name            |
-|-----------------|-----------------|
-| `czech_pimcore` | Czech Pimcore   |
-| `french_pimcore`| French Pimcore  |
-| `sap_spirit`    | SAP Spirit      |
+| id               | name            |
+|------------------|-----------------|
+| `czech_pimcore`  | Czech Pimcore   |
+| `french_pimcore` | French Pimcore  |
+| `german_pimcore` | German Pimcore  |
+| `sap_spirit`     | SAP Spirit      |
 
-Never created through the UI. To add a fourth project, edit the seed and
+Never created through the UI. To add another project, edit the seed and
 re-run `npm run db:seed`.
 
 ### `Report`
