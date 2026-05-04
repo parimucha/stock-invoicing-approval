@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { minutesToHours } from "@/lib/format";
+import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 
 export default async function AdminHome() {
   const reports = await prisma.report.findMany({
@@ -33,6 +33,7 @@ export default async function AdminHome() {
                 <th className="text-left px-4 py-2 font-medium">Status</th>
                 <th className="text-left px-4 py-2 font-medium">Items</th>
                 <th className="text-left px-4 py-2 font-medium">Hours</th>
+                <th className="text-left px-4 py-2 font-medium">Cost</th>
                 <th className="text-left px-4 py-2 font-medium">Created</th>
                 <th className="text-left px-4 py-2 font-medium">Sent</th>
                 <th className="text-left px-4 py-2 font-medium">Reviewed</th>
@@ -42,6 +43,7 @@ export default async function AdminHome() {
             <tbody>
               {reports.map((r) => {
                 const total = r.items.reduce((s, i) => s + i.workedMinutes, 0);
+                const cost = minutesToCzk(total, r.hourlyRateCzk);
                 return (
                   <tr key={r.id} className="border-t border-neutral-100">
                     <td className="px-4 py-2 font-medium">{r.label}</td>
@@ -50,6 +52,9 @@ export default async function AdminHome() {
                     </td>
                     <td className="px-4 py-2">{r._count.items}</td>
                     <td className="px-4 py-2">{minutesToHours(total)} h</td>
+                    <td className="px-4 py-2 text-neutral-600">
+                      {cost != null ? formatCzk(cost) : "—"}
+                    </td>
                     <td className="px-4 py-2 text-neutral-600">
                       {r.createdAt.toLocaleDateString()}
                     </td>

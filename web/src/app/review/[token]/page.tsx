@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { minutesToHours } from "@/lib/format";
+import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
 import { reopenReview, saveReviewerNote, signOff } from "./actions";
 import { ReviewItems } from "./ReviewItems";
@@ -38,6 +38,7 @@ export default async function ReviewPage({
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
   const locked = report.status === "approved" || report.status === "rejected";
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
+  const totalCost = minutesToCzk(totalMinutes, report.hourlyRateCzk);
   const jiraBaseUrl = getJiraBaseUrl();
 
   return (
@@ -51,6 +52,7 @@ export default async function ReviewPage({
                 {report.periodStart.toISOString().slice(0, 10)} →{" "}
                 {report.periodEnd.toISOString().slice(0, 10)} · {report.items.length} items ·{" "}
                 {minutesToHours(totalMinutes)} h
+                {totalCost != null && <> · {formatCzk(totalCost)}</>}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -75,6 +77,7 @@ export default async function ReviewPage({
           token={token}
           locked={locked}
           jiraBaseUrl={jiraBaseUrl}
+          hourlyRateCzk={report.hourlyRateCzk}
         />
 
         {!locked && (

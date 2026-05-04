@@ -156,6 +156,36 @@ export async function updatePortaNotes(formData: FormData) {
   revalidatePath(`/admin/reports/${reportId}`);
 }
 
+export async function updateHourlyRate(formData: FormData) {
+  await requireAdmin();
+  const reportId = Number(formData.get("reportId"));
+  if (!reportId) throw new Error("Missing report id.");
+
+  const raw = String(formData.get("hourlyRateCzk") ?? "").trim();
+  let rate: number | null;
+  if (raw === "") {
+    rate = null;
+  } else {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || !Number.isInteger(n)) {
+      throw new Error("Hourly rate must be a whole non-negative number.");
+    }
+    rate = n;
+  }
+
+  const report = await prisma.report.findUnique({ where: { id: reportId } });
+  if (!report) notFound();
+
+  await prisma.report.update({
+    where: { id: reportId },
+    data: { hourlyRateCzk: rate },
+  });
+
+  revalidatePath(`/admin/reports/${reportId}`);
+  revalidatePath(`/review/${report.magicToken}`);
+  revalidatePath("/admin");
+}
+
 export async function updateItemSummary(formData: FormData) {
   const reportId = Number(formData.get("reportId"));
   const itemId = Number(formData.get("itemId"));

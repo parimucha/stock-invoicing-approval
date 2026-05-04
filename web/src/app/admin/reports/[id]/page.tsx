@@ -3,13 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
-import { minutesToHours } from "@/lib/format";
+import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmForm } from "@/components/ConfirmForm";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
-import { resetReport } from "./actions";
+import { resetReport, updateHourlyRate } from "./actions";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -94,6 +94,10 @@ export default async function ReportDetailPage({
     }
   }
   const invoiceableMinutes = totalMinutes - internalMinutes;
+  const rate = report.hourlyRateCzk;
+  const totalCost = minutesToCzk(totalMinutes, rate);
+  const internalCost = minutesToCzk(internalMinutes, rate);
+  const invoiceableCost = minutesToCzk(invoiceableMinutes, rate);
 
   return (
     <div className="space-y-6">
@@ -105,6 +109,7 @@ export default async function ReportDetailPage({
             {report.periodEnd.toISOString().slice(0, 10)} ·{" "}
             <span className="capitalize">{report.status.replace("_", " ")}</span> ·{" "}
             {report.items.length} items · {minutesToHours(totalMinutes)} h total
+            {totalCost != null && <> · {formatCzk(totalCost)}</>}
           </p>
           {report.productiveBudgetName && (
             <p className="text-xs text-neutral-500 mt-1">
@@ -165,6 +170,35 @@ export default async function ReportDetailPage({
         </div>
       </section>
 
+      <section className="bg-white border border-neutral-200 rounded-lg p-4 space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold mb-1">Hourly rate</h2>
+          <p className="text-xs text-neutral-500 mb-2">
+            CZK per hour. Costs round up to whole crowns and appear next to every
+            hours figure for this report. Leave blank to hide costs.
+          </p>
+          <form action={updateHourlyRate} className="flex items-center gap-2">
+            <input type="hidden" name="reportId" value={report.id} />
+            <input
+              type="number"
+              name="hourlyRateCzk"
+              defaultValue={rate ?? ""}
+              min={0}
+              step={1}
+              placeholder="e.g. 1500"
+              className="text-sm border border-neutral-300 rounded px-2 py-1 w-32"
+            />
+            <span className="text-sm text-neutral-600">Kč / h</span>
+            <PendingButton
+              className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-neutral-50"
+              pendingLabel="Saving…"
+            >
+              Save rate
+            </PendingButton>
+          </form>
+        </div>
+      </section>
+
       <section className="bg-white border border-neutral-200 rounded-lg p-4">
         <h2 className="text-sm font-semibold mb-2">Invoice preview (current assignments)</h2>
         <p className="text-xs text-neutral-500 mb-2">
@@ -176,6 +210,11 @@ export default async function ReportDetailPage({
               <tr key={name} className="border-t border-neutral-100 first:border-t-0">
                 <td className="py-1.5 text-neutral-700">{name}</td>
                 <td className="py-1.5 text-right font-medium">{minutesToHours(mins)} h</td>
+                {rate != null && (
+                  <td className="py-1.5 text-right font-medium text-neutral-600 w-28">
+                    {formatCzk(minutesToCzk(mins, rate))}
+                  </td>
+                )}
               </tr>
             ))}
             <tr className="border-t-2 border-neutral-200">
@@ -183,11 +222,21 @@ export default async function ReportDetailPage({
               <td className="py-1.5 text-right font-semibold">
                 {minutesToHours(invoiceableMinutes)} h
               </td>
+              {rate != null && (
+                <td className="py-1.5 text-right font-semibold w-28">
+                  {formatCzk(invoiceableCost)}
+                </td>
+              )}
             </tr>
             {internalMinutes > 0 && (
               <tr className="border-t border-neutral-100 text-neutral-500">
                 <td className="py-1.5">Internal (hidden from client)</td>
                 <td className="py-1.5 text-right">{minutesToHours(internalMinutes)} h</td>
+                {rate != null && (
+                  <td className="py-1.5 text-right w-28">
+                    {formatCzk(internalCost)}
+                  </td>
+                )}
               </tr>
             )}
           </tbody>
@@ -206,6 +255,7 @@ export default async function ReportDetailPage({
         jiraBaseUrl={jiraBaseUrl}
         editable={editable}
         mergeTargets={mergeTargets}
+        hourlyRateCzk={rate}
       />
 
       {report.reviewerNote && (

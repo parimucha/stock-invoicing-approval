@@ -13,3 +13,16 @@ export function diffHours(estSec: number | null | undefined, workedMin: number):
   const s = d >= 0 ? "+" : "";
   return `${s}${d.toFixed(1)}`;
 }
+
+export function minutesToCzk(
+  minutes: number,
+  ratePerHourCzk: number | null | undefined,
+): number | null {
+  if (ratePerHourCzk == null) return null;
+  return Math.ceil((minutes / 60) * ratePerHourCzk);
+}
+
+export function formatCzk(amount: number | null | undefined): string {
+  if (amount == null) return "—";
+  return `${amount.toLocaleString("cs-CZ")} Kč`;
+}

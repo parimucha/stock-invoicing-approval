@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Project, ReportItem } from "@prisma/client";
 
-import { minutesToHours } from "@/lib/format";
+import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { ItemCard } from "./ItemCard";
 
@@ -17,13 +17,21 @@ type Props = {
   token: string;
   locked: boolean;
   jiraBaseUrl: string | null;
+  hourlyRateCzk: number | null;
 };
 
 type SortKey = "worked-desc" | "worked-asc" | "over" | "under" | "key";
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 type SourceFilter = "all" | "jira" | "pm";
 
-export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Props) {
+export function ReviewItems({
+  items,
+  projects,
+  token,
+  locked,
+  jiraBaseUrl,
+  hourlyRateCzk,
+}: Props) {
   const [sort, setSort] = useState<SortKey>("worked-desc");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<SourceFilter>("all");
@@ -141,6 +149,7 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
         buckets={buckets}
         totalMinutes={totalMinutes}
         pmMinutes={pmMinutes}
+        hourlyRateCzk={hourlyRateCzk}
       />
 
       <FilterBar
@@ -156,12 +165,15 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
         totalCount={items.length}
       />
 
-      {groups.map((g) =>
-        g.items.length === 0 ? null : (
+      {groups.map((g) => {
+        if (g.items.length === 0) return null;
+        const groupMinutes = g.items.reduce((s, i) => s + i.workedMinutes, 0);
+        const groupCost = minutesToCzk(groupMinutes, hourlyRateCzk);
+        return (
           <section key={g.name} className="space-y-3">
             <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide">
-              {g.name} ·{" "}
-              {minutesToHours(g.items.reduce((s, i) => s + i.workedMinutes, 0))} h ·{" "}
+              {g.name} · {minutesToHours(groupMinutes)} h ·{" "}
+              {groupCost != null && <>{formatCzk(groupCost)} · </>}
               {g.items.length} {g.items.length === 1 ? "item" : "items"}
             </h2>
             <div className="space-y-3">
@@ -175,12 +187,13 @@ export function ReviewItems({ items, projects, token, locked, jiraBaseUrl }: Pro
                   jiraBaseUrl={jiraBaseUrl}
                   assigned={assignments[it.id] ?? []}
                   onAssignedChange={(next) => setItemAssignments(it.id, next)}
+                  hourlyRateCzk={hourlyRateCzk}
                 />
               ))}
             </div>
           </section>
-        ),
-      )}
+        );
+      })}
 
       {sorted.length === 0 && (
         <div className="text-sm text-neutral-500 italic text-center py-8">
@@ -195,10 +208,12 @@ function InvoiceOverview({
   buckets,
   totalMinutes,
   pmMinutes,
+  hourlyRateCzk,
 }: {
   buckets: Record<string, number>;
   totalMinutes: number;
   pmMinutes: number;
+  hourlyRateCzk: number | null;
 }) {
   const sectionRef = useRef<HTMLElement>(null);
   const [collapsed, setCollapsed] = useState(false);
@@ -223,6 +238,7 @@ function InvoiceOverview({
 
   const pmPct = totalMinutes > 0 ? (pmMinutes / totalMinutes) * 100 : 0;
   const pmOver = pmPct > 20;
+  const totalCost = minutesToCzk(totalMinutes, hourlyRateCzk);
 
   if (collapsed) {
     return (
@@ -231,14 +247,20 @@ function InvoiceOverview({
         className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg shadow-sm"
       >
         <div className="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          {Object.entries(buckets).map(([name, mins]) => (
-            <span key={name}>
-              <span className="text-neutral-500">{name}</span>{" "}
-              <span className="font-medium text-neutral-800">
-                {minutesToHours(mins)} h
+          {Object.entries(buckets).map(([name, mins]) => {
+            const cost = minutesToCzk(mins, hourlyRateCzk);
+            return (
+              <span key={name}>
+                <span className="text-neutral-500">{name}</span>{" "}
+                <span className="font-medium text-neutral-800">
+                  {minutesToHours(mins)} h
+                </span>
+                {cost != null && (
+                  <span className="text-neutral-500"> · {formatCzk(cost)}</span>
+                )}
               </span>
-            </span>
-          ))}
+            );
+          })}
           <span className="text-neutral-300" aria-hidden="true">
             ·
           </span>
@@ -252,6 +274,7 @@ function InvoiceOverview({
           </span>
           <span className="font-semibold">
             Total {minutesToHours(totalMinutes)} h
+            {totalCost != null && <> · {formatCzk(totalCost)}</>}
           </span>
         </div>
       </section>
@@ -274,11 +297,21 @@ function InvoiceOverview({
             <tr key={name} className="border-t border-neutral-100 first:border-t-0">
               <td className="py-2 text-neutral-700">{name}</td>
               <td className="py-2 text-right font-medium">{minutesToHours(mins)} h</td>
+              {hourlyRateCzk != null && (
+                <td className="py-2 text-right font-medium text-neutral-600 w-28">
+                  {formatCzk(minutesToCzk(mins, hourlyRateCzk))}
+                </td>
+              )}
             </tr>
           ))}
           <tr className="border-t-2 border-neutral-200">
             <td className="py-2 font-semibold">Total</td>
             <td className="py-2 text-right font-semibold">{minutesToHours(totalMinutes)} h</td>
+            {hourlyRateCzk != null && (
+              <td className="py-2 text-right font-semibold w-28">
+                {formatCzk(totalCost)}
+              </td>
+            )}
           </tr>
         </tbody>
       </table>

@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState } from "react";
 import type { ReportItem } from "@prisma/client";
 
-import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
+import { formatCzk, minutesToCzk, minutesToHours, secondsToHours, diffHours } from "@/lib/format";
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
@@ -21,6 +21,7 @@ type Props = {
   jiraBaseUrl: string | null;
   editable: boolean;
   mergeTargets: MergeTarget[];
+  hourlyRateCzk: number | null;
 };
 
 type SortKey = "worked-desc" | "worked-asc" | "over" | "under" | "key";
@@ -33,6 +34,7 @@ export function AdminItemsTable({
   jiraBaseUrl,
   editable,
   mergeTargets,
+  hourlyRateCzk,
 }: Props) {
   const [sort, setSort] = useState<SortKey>("worked-desc");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -165,6 +167,11 @@ export function AdminItemsTable({
                     </td>
                     <td className="px-3 py-2 text-right">
                       <div>{minutesToHours(it.workedMinutes)}</div>
+                      {hourlyRateCzk != null && (
+                        <div className="text-xs text-neutral-500">
+                          {formatCzk(minutesToCzk(it.workedMinutes, hourlyRateCzk))}
+                        </div>
+                      )}
                       <BudgetBar
                         workedMinutes={it.workedMinutes}
                         estimatedSeconds={it.estimatedSeconds}

@@ -41,6 +41,7 @@ model Report {
   periodEnd            DateTime     @db.Date
   productiveDealId     String?
   productiveBudgetName String?
+  hourlyRateCzk        Int?
   status               ReportStatus @default(draft)
   magicToken           String       @unique
   reviewerNote         String?      @db.Text

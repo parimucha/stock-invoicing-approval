@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import type { Approval, Project, ReportItem } from "@prisma/client";
 
-import { minutesToHours, secondsToHours, diffHours } from "@/lib/format";
+import { formatCzk, minutesToCzk, minutesToHours, secondsToHours, diffHours } from "@/lib/format";
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { saveItem } from "./actions";
@@ -20,6 +20,7 @@ type Props = {
   jiraBaseUrl: string | null;
   assigned: string[];
   onAssignedChange: (next: string[]) => void;
+  hourlyRateCzk: number | null;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -41,7 +42,9 @@ export function ItemCard({
   jiraBaseUrl,
   assigned,
   onAssignedChange,
+  hourlyRateCzk,
 }: Props) {
+  const itemCost = minutesToCzk(item.workedMinutes, hourlyRateCzk);
   const [comment, setComment] = useState(item.reviewerComment ?? "");
   const [approval, setApproval] = useState<Approval>(item.approval);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -158,6 +161,11 @@ export function ItemCard({
           <div className="font-semibold whitespace-nowrap">
             {minutesToHours(item.workedMinutes)} h worked
           </div>
+          {itemCost != null && (
+            <div className="text-xs text-neutral-600 whitespace-nowrap">
+              {formatCzk(itemCost)}
+            </div>
+          )}
           <BudgetBar
             workedMinutes={item.workedMinutes}
             estimatedSeconds={item.estimatedSeconds}
