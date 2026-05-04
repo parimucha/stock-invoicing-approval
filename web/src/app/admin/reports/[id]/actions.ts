@@ -156,6 +156,61 @@ export async function updatePortaNotes(formData: FormData) {
   revalidatePath(`/admin/reports/${reportId}`);
 }
 
+export async function addItem(formData: FormData) {
+  const reportId = Number(formData.get("reportId"));
+  if (!reportId) throw new Error("Missing report id.");
+
+  const report = await loadDraftReport(reportId);
+
+  const summary = String(formData.get("summary") ?? "").trim();
+  if (!summary) throw new Error("Summary is required.");
+
+  const hoursStr = String(formData.get("hoursWorked") ?? "").trim();
+  const hours = Number(hoursStr);
+  if (!Number.isFinite(hours) || hours < 0) {
+    throw new Error("Hours worked must be a non-negative number.");
+  }
+  const workedMinutes = Math.round(hours * 60);
+
+  const jiraKey = String(formData.get("jiraKey") ?? "").trim() || null;
+  const portaNotes = String(formData.get("portaNotes") ?? "").trim() || null;
+  const internal = formData.get("internal") != null;
+  const projectIds = formData
+    .getAll("projectIds")
+    .map(String)
+    .filter(Boolean);
+
+  if (projectIds.length > 0) {
+    const known = await prisma.project.findMany({
+      where: { id: { in: projectIds } },
+      select: { id: true },
+    });
+    if (known.length !== new Set(projectIds).size) {
+      throw new Error("Unknown project id submitted.");
+    }
+  }
+
+  await prisma.reportItem.create({
+    data: {
+      reportId: report.id,
+      source: "project_management",
+      jiraKey,
+      summary,
+      workedMinutes,
+      jiraLabels: [],
+      suggestedProjects: projectIds,
+      portaNotes,
+      internal,
+      assignments: {
+        create: projectIds.map((pid) => ({ projectId: pid })),
+      },
+    },
+  });
+
+  revalidatePath(`/admin/reports/${reportId}`);
+  revalidatePath(`/review/${report.magicToken}`);
+}
+
 export async function updateHourlyRate(formData: FormData) {
   await requireAdmin();
   const reportId = Number(formData.get("reportId"));

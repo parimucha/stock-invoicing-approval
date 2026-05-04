@@ -9,7 +9,7 @@ import { PendingButton } from "@/components/PendingButton";
 import { ConfirmForm } from "@/components/ConfirmForm";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
-import { resetReport, updateHourlyRate } from "./actions";
+import { addItem, resetReport, updateHourlyRate } from "./actions";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -248,6 +248,83 @@ export default async function ReportDetailPage({
           />
         </div>
       </section>
+
+      {editable && (
+        <section className="bg-white border border-neutral-200 rounded-lg p-4">
+          <details>
+            <summary className="cursor-pointer text-sm font-semibold select-none">
+              + Add item manually
+            </summary>
+            <form action={addItem} className="mt-4 space-y-3">
+              <input type="hidden" name="reportId" value={report.id} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="block text-xs font-medium text-neutral-600 md:col-span-2">
+                  Summary
+                  <input
+                    name="summary"
+                    required
+                    className="mt-1 w-full text-sm border border-neutral-300 rounded px-2 py-1 font-normal"
+                    placeholder="What was done…"
+                  />
+                </label>
+                <label className="block text-xs font-medium text-neutral-600">
+                  Hours worked
+                  <input
+                    name="hoursWorked"
+                    type="number"
+                    required
+                    min={0}
+                    step="0.25"
+                    className="mt-1 w-full text-sm border border-neutral-300 rounded px-2 py-1 font-normal"
+                    placeholder="e.g. 1.5"
+                  />
+                  <span className="block mt-1 text-[11px] font-normal text-neutral-500">
+                    Decimal hours; rounds to whole minutes on save.
+                  </span>
+                </label>
+                <label className="block text-xs font-medium text-neutral-600">
+                  JIRA key (optional)
+                  <input
+                    name="jiraKey"
+                    className="mt-1 w-full text-sm border border-neutral-300 rounded px-2 py-1 font-normal font-mono"
+                    placeholder="PCM2-123"
+                  />
+                </label>
+              </div>
+              <label className="block text-xs font-medium text-neutral-600">
+                PORTA notes (optional)
+                <textarea
+                  name="portaNotes"
+                  rows={2}
+                  className="mt-1 w-full text-sm border border-neutral-300 rounded px-2 py-1 font-normal"
+                  placeholder="Context shown read-only to the reviewer…"
+                />
+              </label>
+              <fieldset className="text-xs text-neutral-600">
+                <legend className="font-medium">Suggested projects (optional)</legend>
+                <div className="mt-1 flex flex-wrap gap-3">
+                  {projects.map((p) => (
+                    <label key={p.id} className="flex items-center gap-1 font-normal">
+                      <input type="checkbox" name="projectIds" value={p.id} />
+                      {p.name}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="flex items-center gap-2 text-xs text-neutral-600 font-medium">
+                <input type="checkbox" name="internal" />
+                Mark as internal (hidden from the client)
+              </label>
+              <PendingButton
+                className="bg-neutral-900 text-white rounded px-3 py-1.5 text-sm hover:bg-neutral-800"
+                pendingLabel="Adding…"
+              >
+                Add item
+              </PendingButton>
+            </form>
+          </details>
+        </section>
+      )}
 
       <AdminItemsTable
         items={report.items}
