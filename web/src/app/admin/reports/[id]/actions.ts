@@ -55,18 +55,27 @@ export async function mergeItems(formData: FormData) {
       : null;
   const mergedNotes = joinNotes(target.pmNotes, sourceSummaryNote, source.pmNotes);
 
+  // Re-derive the target's source from its JIRA key. The source field drives
+  // the PM-share calculation; if the target has a jiraKey it must be
+  // source=jira so the merged minutes don't keep counting as PM. This also
+  // self-heals any rows that ended up with mismatched source/jiraKey from
+  // earlier flows.
+  const targetSource = target.jiraKey ? "jira" : "project_management";
+
   await prisma.$transaction([
     prisma.reportItem.update({
       where: { id: target.id },
       data: {
         workedMinutes: target.workedMinutes + source.workedMinutes,
         pmNotes: mergedNotes,
+        source: targetSource,
       },
     }),
     prisma.reportItem.delete({ where: { id: source.id } }),
   ]);
 
   revalidatePath(`/admin/reports/${reportId}`);
+  revalidatePath(`/review/${report.magicToken}`);
 }
 
 export async function resetReport(formData: FormData) {
@@ -193,7 +202,10 @@ export async function addItem(formData: FormData) {
   await prisma.reportItem.create({
     data: {
       reportId: report.id,
-      source: "project_management",
+      // Source is keyed off the JIRA link so the row classifies consistently
+      // with everything that came from the ingest pipeline; the PM-share cap
+      // and source filter both use this field.
+      source: jiraKey ? "jira" : "project_management",
       jiraKey,
       summary,
       workedMinutes,
