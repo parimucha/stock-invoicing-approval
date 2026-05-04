@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Approval, Project, ReportItem } from "@prisma/client";
 
 import { formatCzk, minutesToCzk, minutesToHours, secondsToHours, diffHours } from "@/lib/format";
@@ -48,16 +48,22 @@ export function ItemCard({
   const [comment, setComment] = useState(item.reviewerComment ?? "");
   const [approval, setApproval] = useState<Approval>(item.approval);
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [, startTransition] = useTransition();
 
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Mirror the latest committed props/state into a ref via useEffect, never
+  // during render — refs mutated in render can hold values from discarded
+  // renders under concurrent React, and the debounced flush would then save a
+  // stale snapshot. The effect runs after every commit, so flush always sees
+  // the most recently rendered values.
   const latest = useRef({ assigned, comment, approval });
-  latest.current = { assigned, comment, approval };
+  useEffect(() => {
+    latest.current = { assigned, comment, approval };
+  }, [assigned, comment, approval]);
 
-  function flush() {
+  async function flush() {
     if (timer.current) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -74,18 +80,16 @@ export function ItemCard({
     fd.set("approval", snap.approval);
 
     setSaveState("saving");
-    startTransition(async () => {
-      try {
-        await saveItem(fd);
-        setSaveState("saved");
-        if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
-        savedResetTimer.current = setTimeout(() => {
-          setSaveState((s) => (s === "saved" ? "idle" : s));
-        }, SAVED_INDICATOR_MS);
-      } catch {
-        setSaveState("error");
-      }
-    });
+    try {
+      await saveItem(fd);
+      setSaveState("saved");
+      if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+      savedResetTimer.current = setTimeout(() => {
+        setSaveState((s) => (s === "saved" ? "idle" : s));
+      }, SAVED_INDICATOR_MS);
+    } catch {
+      setSaveState("error");
+    }
   }
 
   function schedule() {

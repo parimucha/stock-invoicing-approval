@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { Project, ReportItem } from "@prisma/client";
 
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
@@ -215,18 +215,16 @@ function InvoiceOverview({
   pmMinutes: number;
   hourlyRateCzk: number | null;
 }) {
-  const sectionRef = useRef<HTMLElement>(null);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Observe the sticky section itself rather than a sibling sentinel. When the
-  // section is being pinned at top:0.5rem (stuck), its top edge sits above a
-  // root whose top has been shrunk by 9px, so intersectionRatio drops below 1.
-  // This avoids the oscillation trap where the sentinel approach interacts
-  // with the browser's scroll anchoring: if the collapse changes the
-  // overview's own height, its top edge stays pinned to top-2 so the observer
-  // stays in "stuck" state and doesn't flip back to expanded.
-  useEffect(() => {
-    const el = sectionRef.current;
+  // Re-attach the observer every time React mounts a different <section>
+  // element (the conditional below renders distinct nodes for the
+  // expanded/collapsed branches). A useEffect with [] would observe the
+  // initial node forever and stop firing once that node is unmounted —
+  // visible in MS Edge as a sticky bar that gets stuck collapsed and never
+  // reflects scroll-back-to-top. Pairs with `overflow-anchor: none` in
+  // globals.css, which prevents the height-change oscillation loop.
+  const sectionRef = useCallback((el: HTMLElement | null) => {
     if (!el) return;
     const obs = new IntersectionObserver(
       ([entry]) => setCollapsed(entry.intersectionRatio < 1),
