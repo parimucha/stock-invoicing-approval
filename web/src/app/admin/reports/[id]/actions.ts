@@ -253,6 +253,38 @@ export async function updateHourlyRate(formData: FormData) {
   revalidatePath("/admin");
 }
 
+export async function updateItemGroup(formData: FormData) {
+  const reportId = Number(formData.get("reportId"));
+  const itemId = Number(formData.get("itemId"));
+  const groupProjectId = String(formData.get("groupProjectId") ?? "").trim();
+  if (!reportId || !itemId) throw new Error("Missing ids.");
+
+  const report = await loadDraftReport(reportId);
+
+  const item = await prisma.reportItem.findUnique({ where: { id: itemId } });
+  if (!item || item.reportId !== report.id) notFound();
+
+  let nextSuggested: string[];
+  if (groupProjectId === "") {
+    // "Unassigned" — drop the suggestion, item lands in the Unassigned bucket.
+    nextSuggested = [];
+  } else {
+    const project = await prisma.project.findUnique({
+      where: { id: groupProjectId },
+    });
+    if (!project) throw new Error("Unknown project id.");
+    nextSuggested = [groupProjectId];
+  }
+
+  await prisma.reportItem.update({
+    where: { id: itemId },
+    data: { suggestedProjects: nextSuggested },
+  });
+
+  revalidatePath(`/admin/reports/${reportId}`);
+  revalidatePath(`/review/${report.magicToken}`);
+}
+
 export async function updateItemSummary(formData: FormData) {
   const reportId = Number(formData.get("reportId"));
   const itemId = Number(formData.get("itemId"));

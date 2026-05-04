@@ -333,6 +333,7 @@ export default async function ReportDetailPage({
         editable={editable}
         mergeTargets={mergeTargets}
         hourlyRateCzk={rate}
+        projects={projects.map((p) => ({ id: p.id, name: p.name }))}
       />
 
       {report.reviewerNote && (

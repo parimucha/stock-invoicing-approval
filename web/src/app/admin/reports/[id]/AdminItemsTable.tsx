@@ -7,9 +7,16 @@ import { formatCzk, minutesToCzk, minutesToHours, secondsToHours, diffHours } fr
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
 import { PendingButton } from "@/components/PendingButton";
-import { mergeItems, toggleInternal, updateItemSummary, updatePortaNotes } from "./actions";
+import {
+  mergeItems,
+  toggleInternal,
+  updateItemGroup,
+  updateItemSummary,
+  updatePortaNotes,
+} from "./actions";
 
 export type MergeTarget = { id: number; label: string; isJira: boolean };
+export type GroupProject = { id: string; name: string };
 
 type ItemWithAssignments = ReportItem & {
   assignments: { project: { name: string } }[];
@@ -22,6 +29,7 @@ type Props = {
   editable: boolean;
   mergeTargets: MergeTarget[];
   hourlyRateCzk: number | null;
+  projects: GroupProject[];
 };
 
 type SortKey = "worked-desc" | "worked-asc" | "over" | "under" | "key";
@@ -35,6 +43,7 @@ export function AdminItemsTable({
   editable,
   mergeTargets,
   hourlyRateCzk,
+  projects,
 }: Props) {
   const [sort, setSort] = useState<SortKey>("worked-desc");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -224,6 +233,10 @@ export function AdminItemsTable({
                           internal={it.internal}
                           isPm={isPm}
                           targets={mergeTargets.filter((t) => t.id !== it.id)}
+                          projects={projects}
+                          currentGroupProjectId={
+                            ((it.suggestedProjects as string[]) ?? [])[0] ?? ""
+                          }
                         />
                       </td>
                     </tr>
@@ -378,6 +391,8 @@ function EditPanel({
   internal,
   isPm,
   targets,
+  projects,
+  currentGroupProjectId,
 }: {
   reportId: number;
   itemId: number;
@@ -386,11 +401,44 @@ function EditPanel({
   internal: boolean;
   isPm: boolean;
   targets: MergeTarget[];
+  projects: GroupProject[];
+  currentGroupProjectId: string;
 }) {
   const jiraTargets = targets.filter((t) => t.isJira);
   const pmTargets = targets.filter((t) => !t.isJira);
   return (
     <div className="space-y-4">
+      <form action={updateItemGroup} className="space-y-1.5">
+        <input type="hidden" name="reportId" value={reportId} />
+        <input type="hidden" name="itemId" value={itemId} />
+        <label className="block text-xs font-medium text-neutral-600">
+          Show under group
+          <span className="ml-1 font-normal text-neutral-500">
+            — controls which project section the reviewer sees this item under
+          </span>
+        </label>
+        <div className="flex items-center gap-2">
+          <select
+            name="groupProjectId"
+            defaultValue={currentGroupProjectId}
+            className="text-sm border border-neutral-300 rounded px-2 py-1 bg-white"
+          >
+            <option value="">Unassigned</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <PendingButton
+            className="text-xs border border-neutral-300 rounded px-2 py-1 hover:bg-white bg-white"
+            pendingLabel="Saving…"
+          >
+            Save group
+          </PendingButton>
+        </div>
+      </form>
+
       <form action={toggleInternal}>
         <input type="hidden" name="reportId" value={reportId} />
         <input type="hidden" name="itemId" value={itemId} />
