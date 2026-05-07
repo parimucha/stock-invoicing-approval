@@ -47,6 +47,7 @@ async function uploadReport(formData: FormData) {
           jiraKey: i.jira_key,
           summary: i.summary,
           workedMinutes: i.worked_minutes,
+          totalWorkedMinutes: i.total_worked_minutes,
           estimatedSeconds: i.estimated_seconds,
           jiraIssuetype: i.jira_issuetype,
           jiraStatus: i.jira_status,

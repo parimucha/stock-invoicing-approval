@@ -3,6 +3,7 @@ export type UploadItem = {
   jira_key: string | null;
   summary: string;
   worked_minutes: number;
+  total_worked_minutes: number | null;
   estimated_seconds: number | null;
   jira_issuetype: string | null;
   jira_status: string | null;
@@ -77,6 +78,10 @@ export function parseUploadReport(input: unknown): UploadReport {
       jira_key: typeof it.jira_key === "string" ? it.jira_key : null,
       summary: it.summary,
       worked_minutes: it.worked_minutes,
+      total_worked_minutes:
+        typeof it.total_worked_minutes === "number" && it.total_worked_minutes >= 0
+          ? it.total_worked_minutes
+          : null,
       estimated_seconds:
         typeof it.estimated_seconds === "number" ? it.estimated_seconds : null,
       jira_issuetype: typeof it.jira_issuetype === "string" ? it.jira_issuetype : null,

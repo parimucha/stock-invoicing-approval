@@ -22,8 +22,9 @@ a single `report.json` uploaded to the web app.
 data/<YYYY-MM>/
 ├── raw/
 │   ├── productive-entries.json    ← step 1
-│   └── jira-issues.json           ← step 3
-└── report.json                    ← step 4, uploaded in step 5
+│   ├── jira-issues.json           ← step 3
+│   └── productive-totals.json     ← step 4 (optional, lifetime totals)
+└── report.json                    ← step 5, uploaded in step 6
 ```
 
 Everything under `data/` is git-ignored. Raw dumps stay on disk for audit;
@@ -49,16 +50,27 @@ only `report.json` is uploaded.
    summary, status, issuetype, labels, parent key + summary,
    `timeoriginalestimate`. Written to `data/<YYYY-MM>/raw/jira-issues.json`.
 
-4. **Build the report** with
+4. **Pull lifetime totals per JIRA key** with
+   [`scripts/pull-productive-totals.js`](../scripts/pull-productive-totals.js).
+   Calls Productive's `time_entries` endpoint filtered by
+   `company_id=PRODUCTIVE_STOCK_COMPANY_ID` with no date filter, sums minutes
+   per `jira_issue_id` (with the same note-regex fallback used at step 1),
+   and writes `data/<YYYY-MM>/raw/productive-totals.json`. Optional — when
+   absent, step 5 still runs but `total_worked_minutes` stays null and the
+   review page hides the "h total" line.
+
+5. **Build the report** with
    [`scripts/build-report.js`](../scripts/build-report.js). The script:
    - Groups entries by `jira_key` (JIRA items) or normalized Productive
      note (PM items).
    - Sums worked minutes per group.
    - Applies the project-mapping rules (next section).
+   - Copies lifetime minutes from step 4's totals into
+     `total_worked_minutes` on each JIRA item (when the file is present).
    - Emits `data/<YYYY-MM>/report.json` shaped as
      [`UploadReport`](../web/src/lib/report-schema.ts).
 
-5. **Upload** via the admin UI at `/admin/upload`.
+6. **Upload** via the admin UI at `/admin/upload`.
 
 ## Project mapping rules
 

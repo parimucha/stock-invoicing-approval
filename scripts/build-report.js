@@ -77,10 +77,24 @@ function main() {
 
   const peFile = path.join(dataDir, "raw/productive-entries.json");
   const jiFile = path.join(dataDir, "raw/jira-issues.json");
+  const totalsFile = path.join(dataDir, "raw/productive-totals.json");
   const outFile = path.join(dataDir, "report.json");
 
   const pe = JSON.parse(fs.readFileSync(peFile, "utf8"));
   const ji = JSON.parse(fs.readFileSync(jiFile, "utf8"));
+
+  // Optional: lifetime totals per JIRA key, produced by pull-productive-totals.js.
+  // When missing the report still builds; total_worked_minutes stays null.
+  let totalsByKey = null;
+  if (fs.existsSync(totalsFile)) {
+    const t = JSON.parse(fs.readFileSync(totalsFile, "utf8"));
+    totalsByKey = t.totals ?? null;
+  } else {
+    console.warn(
+      `ℹ No ${path.basename(totalsFile)} found — total_worked_minutes will be omitted. ` +
+        `Run scripts/pull-productive-totals.js first to include lifetime totals.`,
+    );
+  }
 
   const issuesByKey = new Map(ji.issues.map((x) => [x.key, x]));
 
@@ -127,11 +141,16 @@ function main() {
         `⚠ JIRA key ${key} appears in Productive but wasn't pulled from JIRA — falling back to minimal record.`,
       );
     }
+    const totalForKey =
+      totalsByKey && Object.prototype.hasOwnProperty.call(totalsByKey, key)
+        ? totalsByKey[key]
+        : null;
     items.push({
       source: "jira",
       jira_key: key,
       summary: issue?.summary ?? key,
       worked_minutes: agg.workedMinutes,
+      total_worked_minutes: totalForKey,
       estimated_seconds: issue?.estimate_seconds ?? null,
       jira_issuetype: issue?.issuetype ?? null,
       jira_status: issue?.status ?? null,
@@ -157,6 +176,7 @@ function main() {
       jira_key: null,
       summary,
       worked_minutes: agg.workedMinutes,
+      total_worked_minutes: null,
       estimated_seconds: null,
       jira_issuetype: null,
       jira_status: null,

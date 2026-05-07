@@ -59,6 +59,7 @@ model ReportItem {
   jiraKey           String?
   summary           String      @db.Text
   workedMinutes     Int
+  totalWorkedMinutes Int?
   estimatedSeconds  Int?
   jiraIssuetype     String?
   jiraStatus        String?

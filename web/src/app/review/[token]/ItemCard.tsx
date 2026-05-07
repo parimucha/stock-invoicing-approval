@@ -170,6 +170,14 @@ export function ItemCard({
               {formatCzk(itemCost)}
             </div>
           )}
+          {item.totalWorkedMinutes != null && item.jiraKey && (
+            <div
+              className="text-xs text-neutral-500 whitespace-nowrap"
+              title="Total worked on this JIRA ticket across all months"
+            >
+              {minutesToHours(item.totalWorkedMinutes)} h total
+            </div>
+          )}
           <BudgetBar
             workedMinutes={item.workedMinutes}
             estimatedSeconds={item.estimatedSeconds}

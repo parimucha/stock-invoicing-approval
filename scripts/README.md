@@ -9,6 +9,7 @@ Runs **locally**, once per month, using this repo plus Claude Code + Atlassian M
    ```
    PRODUCTIVE_API_TOKEN=...
    PRODUCTIVE_ORG_ID=...
+   PRODUCTIVE_STOCK_COMPANY_ID=1055199   # used by step 4 (lifetime totals)
    ```
 2. Claude Code with the **Atlassian MCP** connected (for JIRA metadata).
 3. Node 20+ (scripts are plain CommonJS, no install step).
@@ -69,7 +70,23 @@ Open Claude Code in this repo and run a prompt like:
 Batching keeps each MCP call responsive; `key in (...)` with ~10 keys per batch
 is the tested sweet spot.
 
-### 4. Build the upload-ready report
+### 4. Pull lifetime totals per JIRA key (optional but recommended)
+
+```bash
+node scripts/pull-productive-totals.js data/<YYYY-MM>/raw/productive-totals.json
+```
+
+Pulls every Productive time entry for Stock's company (`PRODUCTIVE_STOCK_COMPANY_ID`,
+no date filter), groups by JIRA key, and writes a `{ totals: { KEY: minutes } }`
+JSON. This becomes the "h total" reference shown next to each JIRA item's
+monthly worked time on the review page — useful for tickets that span more
+than one invoiced month. You can override the company id by passing it
+explicitly: `node scripts/pull-productive-totals.js 1055199 path/to/out.json`.
+
+Skipping this step is fine — `build-report.js` warns and the report still
+builds; the lifetime column just stays empty.
+
+### 5. Build the upload-ready report
 
 ```bash
 node scripts/build-report.js data/<YYYY-MM> <YYYY-MM-01> <YYYY-MM-LL> "stock.cz_design&development (YYYY/MM)"
@@ -87,11 +104,13 @@ Writes `data/<YYYY-MM>/report.json`. The script:
   Unassigned.
 - Sums worked minutes, emits `suggested_projects`, and sorts items by worked
   time descending.
+- If `raw/productive-totals.json` exists (step 4), copies the lifetime
+  minutes for each JIRA key into `total_worked_minutes` per item.
 
 Warnings (`⚠ JIRA key XXX appears in Productive but wasn't pulled from JIRA`)
 mean the key is missing from step 3 — re-run the JIRA pull and include it.
 
-### 5. Upload
+### 6. Upload
 
 - Bring up the web app locally (or use the hosted one).
 - Open `/admin/upload`, paste or attach `data/<YYYY-MM>/report.json`, submit.
@@ -104,7 +123,8 @@ data/<YYYY-MM>/
   raw/
     productive-entries.json    # step 1
     jira-issues.json           # step 3
-  report.json                  # step 4, uploaded in step 5
+    productive-totals.json     # step 4 (optional: lifetime minutes per JIRA key)
+  report.json                  # step 5, uploaded in step 6
 ```
 
 Raw dumps stay on disk for audit; the upload only uses `report.json`.

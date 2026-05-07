@@ -181,6 +181,14 @@ export function AdminItemsTable({
                           {formatCzk(minutesToCzk(it.workedMinutes, hourlyRateCzk))}
                         </div>
                       )}
+                      {it.totalWorkedMinutes != null && it.jiraKey && (
+                        <div
+                          className="text-xs text-neutral-500"
+                          title="Total worked on this JIRA ticket across all months"
+                        >
+                          {minutesToHours(it.totalWorkedMinutes)} h total
+                        </div>
+                      )}
                       <BudgetBar
                         workedMinutes={it.workedMinutes}
                         estimatedSeconds={it.estimatedSeconds}

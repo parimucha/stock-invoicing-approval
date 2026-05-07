@@ -52,7 +52,8 @@ project-management (`source = project_management`, no JIRA key).
 | column             | notes                                                 |
 |--------------------|-------------------------------------------------------|
 | `summary`          | for JIRA items the JIRA summary; for PM items synthesized from Productive notes. Editable (PM only) via admin. |
-| `workedMinutes`    | sum of Productive time entries in this bucket         |
+| `workedMinutes`    | sum of Productive time entries in this bucket (the invoiced month) |
+| `totalWorkedMinutes` | lifetime minutes on this JIRA key across all Stock months/deals. Reference only — not used for invoicing. Set at ingest from `pull-productive-totals.js`; nullable for PM items, manually-added items, and reports built before the totals pull existed. |
 | `estimatedSeconds` | JIRA `timeoriginalestimate`, nullable                 |
 | `jiraIssuetype / Status / Labels` | cached JIRA metadata from ingest time  |
 | `parentKey / parentSummary`       | JIRA parent, for context and mapping   |
