@@ -10,6 +10,7 @@ import { ConfirmForm } from "@/components/ConfirmForm";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
 import { addItem, resetReport, updateHourlyRate } from "./actions";
+import { RefreshTotalsButton } from "./RefreshTotalsButton";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -167,6 +168,18 @@ export default async function ReportDetailPage({
               Reset report
             </PendingButton>
           </ConfirmForm>
+        </div>
+      </section>
+
+      <section className="bg-white border border-neutral-200 rounded-lg p-4 space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold mb-1">Lifetime totals</h2>
+          <p className="text-xs text-neutral-500 mb-2">
+            Pulls each JIRA ticket's total worked time across all of Stock's
+            history from Productive and updates the "h total" reference shown
+            on every JIRA item. Safe to re-run — only that one field changes.
+          </p>
+          <RefreshTotalsButton reportId={report.id} />
         </div>
       </section>
 

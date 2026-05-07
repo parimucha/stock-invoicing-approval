@@ -129,6 +129,33 @@ data/<YYYY-MM>/
 
 Raw dumps stay on disk for audit; the upload only uses `report.json`.
 
+## Backfilling lifetime totals on existing reports
+
+A re-upload via `/admin/upload` deletes and recreates the report — which
+wipes every admin and reviewer edit (manual additions, merges, PORTA
+notes, internal flags, project assignments, approvals, comments,
+report status). To add `totalWorkedMinutes` to a report that already
+has edits on it, do **not** re-upload. Run the backfill instead:
+
+```bash
+# 1. Generate (or refresh) the totals dump.
+node scripts/pull-productive-totals.js data/<YYYY-MM>/raw/productive-totals.json
+
+# 2. Apply it. Connects to whichever DATABASE_URL Prisma sees — for prod,
+#    `vercel env pull` from web/ first.
+cd web
+npx tsx prisma/backfill-totals.ts ../data/<YYYY-MM>/raw/productive-totals.json
+```
+
+Useful flags:
+
+- `--label 2026-03` — only update items in that month's report.
+- `--dry-run` — preview the changes without writing.
+
+The script only touches `ReportItem.totalWorkedMinutes` on JIRA-linked
+rows; everything else is left alone. Re-running with newer totals is
+fine — same JIRA keys overwrite with the latest number.
+
 ## Known edge cases
 
 - **Entry with no JIRA key and no note** falls into a `(person, service)`

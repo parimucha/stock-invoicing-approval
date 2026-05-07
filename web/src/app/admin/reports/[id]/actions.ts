@@ -4,6 +4,17 @@ import { notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
+import { fetchLifetimeMinutesForKeys } from "@/lib/productive";
+
+export type RefreshTotalsResult =
+  | {
+      ok: true;
+      updated: number;
+      unchanged: number;
+      missingFromProductive: number;
+      keysQueried: number;
+    }
+  | { ok: false; error: string };
 
 async function loadDraftReport(reportId: number) {
   await requireAdmin();
@@ -306,4 +317,78 @@ export async function updateItemSummary(formData: FormData) {
   });
 
   revalidatePath(`/admin/reports/${reportId}`);
+}
+
+// Refreshes lifetime totals for every JIRA-linked item in a report by
+// hitting Productive directly. Only ReportItem.totalWorkedMinutes is
+// touched — everything the admin or reviewer has edited is left alone.
+export async function refreshLifetimeTotals(
+  _prev: RefreshTotalsResult | null,
+  formData: FormData,
+): Promise<RefreshTotalsResult> {
+  try {
+    await requireAdmin();
+    const reportId = Number(formData.get("reportId"));
+    if (!reportId) return { ok: false, error: "Missing report id." };
+
+    const items = await prisma.reportItem.findMany({
+      where: { reportId, source: "jira", jiraKey: { not: null } },
+      select: { id: true, jiraKey: true, totalWorkedMinutes: true },
+    });
+    const jiraKeys = [...new Set(items.map((i) => i.jiraKey).filter((k): k is string => !!k))];
+    if (jiraKeys.length === 0) {
+      return { ok: true, updated: 0, unchanged: 0, missingFromProductive: 0, keysQueried: 0 };
+    }
+
+    const totalsByKey = await fetchLifetimeMinutesForKeys(jiraKeys);
+
+    let updated = 0;
+    let unchanged = 0;
+    let missingFromProductive = 0;
+    const updates: Array<{ id: number; minutes: number }> = [];
+
+    for (const item of items) {
+      const key = item.jiraKey;
+      if (!key) continue;
+      const minutes = totalsByKey.get(key);
+      if (minutes == null) {
+        missingFromProductive += 1;
+        continue;
+      }
+      if (item.totalWorkedMinutes === minutes) {
+        unchanged += 1;
+        continue;
+      }
+      updates.push({ id: item.id, minutes });
+    }
+
+    if (updates.length > 0) {
+      await prisma.$transaction(
+        updates.map((u) =>
+          prisma.reportItem.update({
+            where: { id: u.id },
+            data: { totalWorkedMinutes: u.minutes },
+          }),
+        ),
+      );
+      updated = updates.length;
+    }
+
+    const report = await prisma.report.findUnique({
+      where: { id: reportId },
+      select: { magicToken: true },
+    });
+    revalidatePath(`/admin/reports/${reportId}`);
+    if (report) revalidatePath(`/review/${report.magicToken}`);
+
+    return {
+      ok: true,
+      updated,
+      unchanged,
+      missingFromProductive,
+      keysQueried: jiraKeys.length,
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }

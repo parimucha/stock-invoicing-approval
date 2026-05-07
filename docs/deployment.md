@@ -20,6 +20,10 @@ happens on every push to `main`.
    - `ADMIN_PASSWORD` — long, not reused anywhere else.
    - `SESSION_SECRET` — `openssl rand -hex 32` is fine.
    - `JIRA_BASE_URL` (optional) — e.g. `https://your-org.atlassian.net`.
+   - `PRODUCTIVE_API_TOKEN`, `PRODUCTIVE_ORG_ID`, `PRODUCTIVE_STOCK_COMPANY_ID`
+     (optional) — required only by the "Refresh lifetime totals" button on
+     the admin report page. Without them the button is still visible but
+     surfaces a config error when clicked. Same values as the local `.env`.
 5. Trigger a deploy. The first build runs `prisma migrate deploy` against
    the pooled URL, which creates the schema.
 6. Run the seed once (one-off, from your machine):
