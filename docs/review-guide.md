@@ -45,9 +45,10 @@ Sticky at the top. Collapses to a one-line bar when you scroll past it
 (per-project hours, PM share, total). Re-expands when you scroll back to
 the top. Rows:
 
-- **Unassigned / Czech Pimcore / French Pimcore / SAP Spirit** —
-  per-project totals. An item assigned to multiple projects is split
-  evenly across them.
+- **Unassigned + one row per project** (Czech / French / German / Slovak
+  Pimcore, SAP Spirit - general, and the four country-specific SAP Spirit
+  variants) — per-project totals. An item assigned to multiple projects is
+  split evenly across them.
 - **Total** — sum of all worked minutes in the report (excluding items
   that PORTA marked internal; those don't reach the review page).
 - **PM share** — percent of invoiceable time that's project management.

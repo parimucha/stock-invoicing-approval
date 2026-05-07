@@ -65,17 +65,21 @@ only `report.json` is uploaded.
 Evaluated top-to-bottom; first match wins for the strong rules. Multiple
 label matches can stack.
 
-1. JIRA key prefix `SAPS-` → SAP Spirit (always).
+1. JIRA key prefix `SAPS-` → SAP Spirit - general (always). The four
+   country-specific `sap_spirit_*` variants are reviewer-only — ingestion
+   never auto-routes there; the reviewer reassigns when a SAPS ticket is
+   country-scoped.
 2. Parent issue:
    - `PCM2-91` (PIM CZ) → Czech Pimcore
    - `PCM2-92` (PIM FR) → French Pimcore
    - `PCM2-229` (PIM DE) → German Pimcore
-   - `PCM2-124` (PIM SK) → Unassigned (Slovak isn't one of the projects)
+   - `PCM2-187` (PIM SK) → Slovak Pimcore
    - any other parent → skip, go to labels
 3. Labels (weak fallback):
    - `CZ` → Czech Pimcore
    - `France` → French Pimcore
    - `GER` → German Pimcore
+   - `SK` → Slovak Pimcore
    - `SAP` is intentionally **not** a project indicator (it's cross-cutting)
 4. PM items always start Unassigned. The Productive service suffix may be
    surfaced as a hint, but the reviewer does the assignment.

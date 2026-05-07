@@ -17,6 +17,7 @@ const PROJECT_IDS = {
   CZECH: "czech_pimcore",
   FRENCH: "french_pimcore",
   GERMAN: "german_pimcore",
+  SLOVAK: "slovak_pimcore",
   SAP: "sap_spirit",
 };
 
@@ -24,12 +25,14 @@ const PARENT_TO_PROJECT = {
   "PCM2-91": PROJECT_IDS.CZECH, // PIM CZ
   "PCM2-92": PROJECT_IDS.FRENCH, // PIM FR
   "PCM2-229": PROJECT_IDS.GERMAN, // PIM DE
+  "PCM2-187": PROJECT_IDS.SLOVAK, // PIM SK
 };
 
 const LABEL_TO_PROJECT = {
   CZ: PROJECT_IDS.CZECH,
   France: PROJECT_IDS.FRENCH,
   GER: PROJECT_IDS.GERMAN,
+  SK: PROJECT_IDS.SLOVAK,
 };
 
 function suggestProjects(issue) {

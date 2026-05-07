@@ -9,12 +9,21 @@ All persistent state lives in five tables defined in
 
 Fixed list, seeded by [`web/prisma/seed.ts`](../web/prisma/seed.ts):
 
-| id               | name            |
-|------------------|-----------------|
-| `czech_pimcore`  | Czech Pimcore   |
-| `french_pimcore` | French Pimcore  |
-| `german_pimcore` | German Pimcore  |
-| `sap_spirit`     | SAP Spirit      |
+| id               | name                 |
+|------------------|----------------------|
+| `czech_pimcore`  | Czech Pimcore        |
+| `french_pimcore` | French Pimcore       |
+| `german_pimcore` | German Pimcore       |
+| `slovak_pimcore` | Slovak Pimcore       |
+| `sap_spirit`     | SAP Spirit - general |
+| `sap_spirit_cz`  | SAP Spirit - CZ      |
+| `sap_spirit_sk`  | SAP Spirit - SK      |
+| `sap_spirit_fr`  | SAP Spirit - FR      |
+| `sap_spirit_de`  | SAP Spirit - DE      |
+
+The four `sap_spirit_*` country variants are reviewer-only buckets — every
+`SAPS-*` ticket is routed to `sap_spirit` (general) at ingest, and the
+reviewer reassigns to a country variant on the report page when needed.
 
 Never created through the UI. To add another project, edit the seed and
 re-run `npm run db:seed`.
