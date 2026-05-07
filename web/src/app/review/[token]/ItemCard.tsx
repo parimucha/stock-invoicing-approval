@@ -170,14 +170,6 @@ export function ItemCard({
               {formatCzk(itemCost)}
             </div>
           )}
-          {item.totalWorkedMinutes != null && item.jiraKey && (
-            <div
-              className="text-xs text-neutral-500 whitespace-nowrap"
-              title="Total worked on this JIRA ticket across all months"
-            >
-              {minutesToHours(item.totalWorkedMinutes)} h total
-            </div>
-          )}
           <BudgetBar
             workedMinutes={item.workedMinutes}
             estimatedSeconds={item.estimatedSeconds}
@@ -187,6 +179,19 @@ export function ItemCard({
             est {secondsToHours(item.estimatedSeconds)} · Δ{" "}
             {diffHours(item.estimatedSeconds, item.workedMinutes)}
           </div>
+          {item.totalWorkedMinutes != null && item.jiraKey && (
+            <div
+              className="mt-2 pt-2 border-t border-dashed border-neutral-300/80 whitespace-nowrap"
+              title="Total worked on this JIRA ticket across all months"
+            >
+              <div className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">
+                Lifetime
+              </div>
+              <div className="text-xs text-neutral-600">
+                {minutesToHours(item.totalWorkedMinutes)} h total
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
