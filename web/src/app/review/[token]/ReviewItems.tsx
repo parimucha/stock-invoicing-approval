@@ -5,6 +5,7 @@ import type { Project, ReportItem } from "@prisma/client";
 
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
+import { RejectedItemsCard } from "@/components/RejectedItemsCard";
 import { ItemCard } from "./ItemCard";
 
 type ItemWithAssignments = ReportItem & {
@@ -51,22 +52,39 @@ export function ReviewItems({
     setAssignments((prev) => ({ ...prev, [itemId]: next }));
   }, []);
 
-  const totalMinutes = useMemo(
-    () => items.reduce((s, i) => s + i.workedMinutes, 0),
+  // Rejected items are excluded from invoice totals, per-project buckets,
+  // and the PM-share cap — we don't bill for them. They still render in
+  // their normal project group below (with the red rejected card border)
+  // and are summarized in a dedicated RejectedItemsCard.
+  const rejectedItems = useMemo(
+    () => items.filter((i) => i.approval === "rejected"),
     [items],
+  );
+  const billable = useMemo(
+    () => items.filter((i) => i.approval !== "rejected"),
+    [items],
+  );
+
+  const totalMinutes = useMemo(
+    () => billable.reduce((s, i) => s + i.workedMinutes, 0),
+    [billable],
+  );
+  const rejectedMinutes = useMemo(
+    () => rejectedItems.reduce((s, i) => s + i.workedMinutes, 0),
+    [rejectedItems],
   );
   const pmMinutes = useMemo(
     () =>
-      items.reduce(
+      billable.reduce(
         (s, i) => (i.source === "project_management" ? s + i.workedMinutes : s),
         0,
       ),
-    [items],
+    [billable],
   );
   const buckets = useMemo(() => {
     const b: Record<string, number> = { Unassigned: 0 };
     for (const p of projects) b[p.name] = 0;
-    for (const it of items) {
+    for (const it of billable) {
       const assigned = assignments[it.id] ?? [];
       if (assigned.length === 0) {
         b.Unassigned += it.workedMinutes;
@@ -79,7 +97,7 @@ export function ReviewItems({
       }
     }
     return b;
-  }, [items, assignments, projects]);
+  }, [billable, assignments, projects]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -149,7 +167,14 @@ export function ReviewItems({
         buckets={buckets}
         totalMinutes={totalMinutes}
         pmMinutes={pmMinutes}
+        rejectedMinutes={rejectedMinutes}
         hourlyRateCzk={hourlyRateCzk}
+      />
+
+      <RejectedItemsCard
+        items={rejectedItems}
+        hourlyRateCzk={hourlyRateCzk}
+        jiraBaseUrl={jiraBaseUrl}
       />
 
       <FilterBar
@@ -208,11 +233,13 @@ function InvoiceOverview({
   buckets,
   totalMinutes,
   pmMinutes,
+  rejectedMinutes,
   hourlyRateCzk,
 }: {
   buckets: Record<string, number>;
   totalMinutes: number;
   pmMinutes: number;
+  rejectedMinutes: number;
   hourlyRateCzk: number | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -274,6 +301,16 @@ function InvoiceOverview({
             Total {minutesToHours(totalMinutes)} h
             {totalCost != null && <> · {formatCzk(totalCost)}</>}
           </span>
+          {rejectedMinutes > 0 && (
+            <>
+              <span className="text-neutral-300" aria-hidden="true">
+                ·
+              </span>
+              <span className="text-red-700 font-medium">
+                {minutesToHours(rejectedMinutes)} h rejected
+              </span>
+            </>
+          )}
         </div>
       </section>
     );

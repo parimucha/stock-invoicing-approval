@@ -8,6 +8,7 @@ import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmForm } from "@/components/ConfirmForm";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
+import { RejectedItemsCard } from "@/components/RejectedItemsCard";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
 import { addItem, resetReport, updateHourlyRate } from "./actions";
 import { RefreshTotalsButton } from "./RefreshTotalsButton";
@@ -76,18 +77,30 @@ export default async function ReportDetailPage({
     (s, i) => (i.internal ? s + i.workedMinutes : s),
     0,
   );
+  // Rejected items are excluded from invoice totals and per-project buckets,
+  // mirroring how `internal` is handled. They surface in the dedicated
+  // RejectedItemsCard below. Internal items, when also marked rejected,
+  // count as internal first — they never reach the client to be rejected
+  // in practice, but the categorization keeps the math non-overlapping.
+  const rejectedItems = report.items.filter(
+    (i) => !i.internal && i.approval === "rejected",
+  );
+  const rejectedMinutes = rejectedItems.reduce((s, i) => s + i.workedMinutes, 0);
   const pmMinutes = report.items.reduce(
     (s, i) =>
-      !i.internal && i.source === "project_management" ? s + i.workedMinutes : s,
+      !i.internal && i.approval !== "rejected" && i.source === "project_management"
+        ? s + i.workedMinutes
+        : s,
     0,
   );
 
-  // Per-project preview (even-split of worked time) — excludes internal items
-  // because they never reach the client and aren't invoiced.
+  // Per-project preview (even-split of worked time) — excludes both
+  // internal and rejected items since neither is invoiced.
   const buckets: Record<string, number> = { Unassigned: 0 };
   for (const p of projects) buckets[p.name] = 0;
   for (const it of report.items) {
     if (it.internal) continue;
+    if (it.approval === "rejected") continue;
     if (it.assignments.length === 0) {
       buckets.Unassigned += it.workedMinutes;
     } else {
@@ -95,7 +108,7 @@ export default async function ReportDetailPage({
       for (const a of it.assignments) buckets[a.project.name] += share;
     }
   }
-  const invoiceableMinutes = totalMinutes - internalMinutes;
+  const invoiceableMinutes = totalMinutes - internalMinutes - rejectedMinutes;
   const rate = report.hourlyRateCzk;
   const totalCost = minutesToCzk(totalMinutes, rate);
   const internalCost = minutesToCzk(internalMinutes, rate);
@@ -226,7 +239,8 @@ export default async function ReportDetailPage({
       <section className="bg-white border border-neutral-200 rounded-lg p-4">
         <h2 className="text-sm font-semibold mb-2">Invoice preview (current assignments)</h2>
         <p className="text-xs text-neutral-500 mb-2">
-          Internal items are excluded — they never reach the client.
+          Internal items and items rejected by the client are excluded — neither
+          gets invoiced.
         </p>
         <table className="w-full text-sm">
           <tbody>
@@ -263,6 +277,17 @@ export default async function ReportDetailPage({
                 )}
               </tr>
             )}
+            {rejectedMinutes > 0 && (
+              <tr className="border-t border-neutral-100 text-red-700">
+                <td className="py-1.5">Rejected by client</td>
+                <td className="py-1.5 text-right">{minutesToHours(rejectedMinutes)} h</td>
+                {rate != null && (
+                  <td className="py-1.5 text-right w-28">
+                    {formatCzk(minutesToCzk(rejectedMinutes, rate))}
+                  </td>
+                )}
+              </tr>
+            )}
           </tbody>
         </table>
         <div className="mt-4 pt-3 border-t border-neutral-200">
@@ -272,6 +297,12 @@ export default async function ReportDetailPage({
           />
         </div>
       </section>
+
+      <RejectedItemsCard
+        items={rejectedItems}
+        hourlyRateCzk={rate}
+        jiraBaseUrl={jiraBaseUrl}
+      />
 
       {editable && (
         <section className="bg-white border border-neutral-200 rounded-lg p-4">
