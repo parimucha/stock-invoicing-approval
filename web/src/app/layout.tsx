@@ -1,7 +1,21 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
+
+// Speed Insights is a Vercel-only telemetry component — no-op anywhere
+// else, and the module isn't always resolvable in local dev (Turbopack
+// can resolve from the parent dir under multi-package-json setups). Load
+// it dynamically only when running on Vercel so local dev doesn't even
+// try to require it.
+async function SpeedInsightsIfVercel() {
+  if (!process.env.VERCEL) return null;
+  try {
+    const { SpeedInsights } = await import("@vercel/speed-insights/next");
+    return <SpeedInsights />;
+  } catch {
+    return null;
+  }
+}
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,7 +44,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         {children}
-        <SpeedInsights />
+        <SpeedInsightsIfVercel />
       </body>
     </html>
   );

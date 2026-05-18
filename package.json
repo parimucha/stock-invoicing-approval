@@ -13,5 +13,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "eventsource": "^4.1.0"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.3.0"
   }
 }

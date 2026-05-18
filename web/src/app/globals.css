@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* `source("../..")` resolves to web/ — explicit base for Tailwind's class
+   scanner. Without it, v4's auto-detect uses the same cwd-fallback path as
+   the package resolver and ends up scanning the parent dir (which has no
+   tsx files), producing an empty utilities sheet. See the install-at-root
+   workaround in the README for the matching package-resolution fix. */
+@import "tailwindcss" source("../..");
 
 @theme inline {
   --font-sans: var(--font-geist-sans);
