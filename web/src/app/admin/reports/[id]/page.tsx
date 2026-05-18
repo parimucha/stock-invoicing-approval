@@ -8,6 +8,7 @@ import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmForm } from "@/components/ConfirmForm";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
+import { ApprovalBreakdownBar } from "@/components/ApprovalBreakdownBar";
 import { ItemBreakdownCard } from "@/components/ItemBreakdownCard";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
 import { addItem, resetReport, updateHourlyRate } from "./actions";
@@ -309,7 +310,16 @@ export default async function ReportDetailPage({
             )}
           </tbody>
         </table>
-        <div className="mt-4 pt-3 border-t border-neutral-200">
+        <div className="mt-4 pt-3 border-t border-neutral-200 space-y-4">
+          <ApprovalBreakdownBar
+            segments={[
+              { key: "approved", label: "Approved", minutes: invoiceableMinutes, tone: "green" },
+              { key: "pending", label: "Pending", minutes: pendingMinutes, tone: "amber" },
+              { key: "rejected", label: "Rejected", minutes: rejectedMinutes, tone: "red" },
+              { key: "internal", label: "Internal", minutes: internalMinutes, tone: "neutral" },
+            ]}
+            hourlyRateCzk={rate}
+          />
           <PmShareIndicator
             pmMinutes={pmMinutes}
             invoiceableMinutes={invoiceableMinutes}

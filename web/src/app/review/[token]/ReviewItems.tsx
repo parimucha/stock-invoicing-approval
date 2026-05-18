@@ -5,6 +5,7 @@ import type { Project, ReportItem } from "@prisma/client";
 
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
+import { ApprovalBreakdownBar } from "@/components/ApprovalBreakdownBar";
 import { ItemBreakdownCard } from "@/components/ItemBreakdownCard";
 import { ItemCard } from "./ItemCard";
 
@@ -386,7 +387,15 @@ function InvoiceOverview({
           </tr>
         </tbody>
       </table>
-      <div className="mt-3 pt-3 border-t border-neutral-200">
+      <div className="mt-3 pt-3 border-t border-neutral-200 space-y-4">
+        <ApprovalBreakdownBar
+          segments={[
+            { key: "approved", label: "Approved", minutes: totalMinutes, tone: "green" },
+            { key: "pending", label: "Pending", minutes: pendingMinutes, tone: "amber" },
+            { key: "rejected", label: "Rejected", minutes: rejectedMinutes, tone: "red" },
+          ]}
+          hourlyRateCzk={hourlyRateCzk}
+        />
         <PmShareIndicator pmMinutes={pmMinutes} invoiceableMinutes={totalMinutes} />
       </div>
     </section>
