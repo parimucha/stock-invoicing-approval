@@ -39,6 +39,16 @@ export async function saveItem(formData: FormData) {
   const item = await prisma.reportItem.findUnique({ where: { id: itemId } });
   if (!item || item.reportId !== report.id) throw new Error("Item not found.");
 
+  // An item with no projects ticked has nowhere to bill — it would land in
+  // the Unassigned bucket and quietly inflate the invoice's "Unassigned"
+  // row. The client-side UI also blocks this, but the server is the
+  // authoritative gate (handles direct API calls, stale clients, etc.).
+  if (approval === "approved" && projectIds.length === 0) {
+    throw new Error(
+      "Tick at least one project before approving — approved items must bill somewhere.",
+    );
+  }
+
   await prisma.$transaction([
     prisma.projectAssignment.deleteMany({ where: { itemId } }),
     prisma.projectAssignment.createMany({

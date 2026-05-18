@@ -429,9 +429,10 @@ function EditPanel({
         <input type="hidden" name="reportId" value={reportId} />
         <input type="hidden" name="itemId" value={itemId} />
         <label className="block text-xs font-medium text-neutral-600">
-          Show under group
+          Project group
           <span className="ml-1 font-normal text-neutral-500">
-            — controls which project section the reviewer sees this item under
+            — sets both the section the reviewer sees this item under and the
+            project it bills to. Reviewer can still re-tick to split.
           </span>
         </label>
         <div className="flex items-center gap-2">

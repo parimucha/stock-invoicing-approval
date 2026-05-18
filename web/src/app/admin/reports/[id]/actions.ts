@@ -298,10 +298,27 @@ export async function updateItemGroup(formData: FormData) {
     nextSuggested = [groupProjectId];
   }
 
-  await prisma.reportItem.update({
-    where: { id: itemId },
-    data: { suggestedProjects: nextSuggested },
-  });
+  // Sync both the grouping hint (suggestedProjects, used by the review/admin
+  // item layout) and the billing assignment (ProjectAssignment rows, used by
+  // the invoice math). Updating only the suggestion — as this action did
+  // originally — left items visually under a group while contributing zero
+  // to that group's bucket, so they silently fell into "Unassigned" on the
+  // invoice preview.
+  await prisma.$transaction([
+    prisma.projectAssignment.deleteMany({ where: { itemId } }),
+    ...(nextSuggested.length > 0
+      ? [
+          prisma.projectAssignment.createMany({
+            data: nextSuggested.map((projectId) => ({ itemId, projectId })),
+            skipDuplicates: true,
+          }),
+        ]
+      : []),
+    prisma.reportItem.update({
+      where: { id: itemId },
+      data: { suggestedProjects: nextSuggested },
+    }),
+  ]);
 
   revalidatePath(`/admin/reports/${reportId}`);
   revalidatePath(`/review/${report.magicToken}`);

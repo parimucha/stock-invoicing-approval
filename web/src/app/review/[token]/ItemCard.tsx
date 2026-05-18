@@ -112,10 +112,20 @@ export function ItemCard({
     const next = new Set(assigned);
     if (on) next.add(id);
     else next.delete(id);
-    onAssignedChange([...next].sort());
+    const nextArr = [...next].sort();
+    onAssignedChange(nextArr);
+    // An approved item with zero projects has nowhere to bill — would land
+    // in the Unassigned bucket. Auto-revert to pending so the state stays
+    // consistent and the server-side gate in saveItem doesn't reject the
+    // autosave. Matches what the disabled "Approved" radio enforces going
+    // the other direction.
+    if (nextArr.length === 0 && approval === "approved") {
+      setApproval("pending");
+    }
     schedule();
   }
 
+  const noProjects = assigned.length === 0;
   const radioName = `approval-${item.id}`;
   const cardClass = `border rounded-lg p-4 space-y-3 transition-colors ${APPROVAL_CARD_STYLES[approval]}`;
 
@@ -251,21 +261,33 @@ export function ItemCard({
 
       <div className="flex items-center justify-between pt-2 border-t border-neutral-200/60">
         <div className="flex gap-4 text-sm">
-          {(["approved", "rejected", "pending"] as const).map((v) => (
-            <label key={v} className="flex items-center gap-1">
-              <input
-                type="radio"
-                name={radioName}
-                checked={approval === v}
-                onChange={() => {
-                  setApproval(v);
-                  schedule();
-                }}
-                disabled={locked}
-              />
-              <span className="capitalize">{v}</span>
-            </label>
-          ))}
+          {(["approved", "rejected", "pending"] as const).map((v) => {
+            const disabledForNoProjects = v === "approved" && noProjects;
+            const disabled = locked || disabledForNoProjects;
+            return (
+              <label
+                key={v}
+                className={`flex items-center gap-1 ${disabled ? "text-neutral-400" : ""}`}
+                title={
+                  disabledForNoProjects
+                    ? "Tick at least one project to approve — approved items must bill somewhere."
+                    : undefined
+                }
+              >
+                <input
+                  type="radio"
+                  name={radioName}
+                  checked={approval === v}
+                  onChange={() => {
+                    setApproval(v);
+                    schedule();
+                  }}
+                  disabled={disabled}
+                />
+                <span className="capitalize">{v}</span>
+              </label>
+            );
+          })}
         </div>
         <SaveIndicator state={saveState} locked={locked} />
       </div>
