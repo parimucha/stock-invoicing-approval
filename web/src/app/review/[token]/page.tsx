@@ -172,12 +172,25 @@ function ReviewHelpContent() {
       <section>
         <h3 className="font-semibold mb-1">Invoice overview (top bar)</h3>
         <p>
-          Per-project totals based on current assignments. Items assigned to
-          multiple projects are split evenly across them.{" "}
+          Per-project totals based on current assignments — but only for items
+          you&apos;ve <strong>approved</strong>. Items assigned to multiple
+          projects are split evenly across them.{" "}
           <strong>PM share</strong> shows how much of the invoiceable time was
           project management — it must stay within the 20% cap (green / red
-          indicator). The bar collapses to a one-line summary as you scroll and
-          re-expands at the top.
+          indicator). The bar collapses to a one-line summary as you scroll
+          and re-expands at the top; while collapsed, any pending or rejected
+          hours show as colored badges next to the total.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="font-semibold mb-1">Pending and rejected sections</h3>
+        <p>
+          Items you haven&apos;t approved yet appear in the amber{" "}
+          <strong>Pending your review</strong> card; items you rejected appear
+          in the red <strong>Rejected by client</strong> card. Neither
+          contributes to the invoice total above until approved. The cards
+          disappear once empty.
         </p>
       </section>
 

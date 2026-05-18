@@ -8,7 +8,7 @@ import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
 import { ConfirmForm } from "@/components/ConfirmForm";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
-import { RejectedItemsCard } from "@/components/RejectedItemsCard";
+import { ItemBreakdownCard } from "@/components/ItemBreakdownCard";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
 import { addItem, resetReport, updateHourlyRate } from "./actions";
 import { RefreshTotalsButton } from "./RefreshTotalsButton";
@@ -77,30 +77,35 @@ export default async function ReportDetailPage({
     (s, i) => (i.internal ? s + i.workedMinutes : s),
     0,
   );
-  // Rejected items are excluded from invoice totals and per-project buckets,
-  // mirroring how `internal` is handled. They surface in the dedicated
-  // RejectedItemsCard below. Internal items, when also marked rejected,
-  // count as internal first — they never reach the client to be rejected
-  // in practice, but the categorization keeps the math non-overlapping.
+  // Invoiceable = only items the reviewer has explicitly approved. Pending
+  // and rejected items are both excluded and shown separately so the admin
+  // can see what's not yet billable at a glance. Internal items always come
+  // out first (they're hidden from the client and can't be reviewed); the
+  // categorization is internal → rejected → pending → approved so the math
+  // is non-overlapping.
+  const pendingItems = report.items.filter(
+    (i) => !i.internal && i.approval === "pending",
+  );
   const rejectedItems = report.items.filter(
     (i) => !i.internal && i.approval === "rejected",
   );
+  const pendingMinutes = pendingItems.reduce((s, i) => s + i.workedMinutes, 0);
   const rejectedMinutes = rejectedItems.reduce((s, i) => s + i.workedMinutes, 0);
   const pmMinutes = report.items.reduce(
     (s, i) =>
-      !i.internal && i.approval !== "rejected" && i.source === "project_management"
+      !i.internal && i.approval === "approved" && i.source === "project_management"
         ? s + i.workedMinutes
         : s,
     0,
   );
 
-  // Per-project preview (even-split of worked time) — excludes both
-  // internal and rejected items since neither is invoiced.
+  // Per-project preview (even-split of worked time) — only approved items
+  // contribute. Pending and rejected each get their own breakdown card.
   const buckets: Record<string, number> = { Unassigned: 0 };
   for (const p of projects) buckets[p.name] = 0;
   for (const it of report.items) {
     if (it.internal) continue;
-    if (it.approval === "rejected") continue;
+    if (it.approval !== "approved") continue;
     if (it.assignments.length === 0) {
       buckets.Unassigned += it.workedMinutes;
     } else {
@@ -108,7 +113,8 @@ export default async function ReportDetailPage({
       for (const a of it.assignments) buckets[a.project.name] += share;
     }
   }
-  const invoiceableMinutes = totalMinutes - internalMinutes - rejectedMinutes;
+  const invoiceableMinutes =
+    totalMinutes - internalMinutes - rejectedMinutes - pendingMinutes;
   const rate = report.hourlyRateCzk;
   const totalCost = minutesToCzk(totalMinutes, rate);
   const internalCost = minutesToCzk(internalMinutes, rate);
@@ -239,8 +245,10 @@ export default async function ReportDetailPage({
       <section className="bg-white border border-neutral-200 rounded-lg p-4">
         <h2 className="text-sm font-semibold mb-2">Invoice preview (current assignments)</h2>
         <p className="text-xs text-neutral-500 mb-2">
-          Internal items and items rejected by the client are excluded — neither
-          gets invoiced.
+          Only items the client has explicitly <strong>approved</strong> count
+          toward the invoice. Items still pending review, rejected by the
+          client, or marked internal are listed separately and don&apos;t
+          contribute to the total.
         </p>
         <table className="w-full text-sm">
           <tbody>
@@ -266,13 +274,13 @@ export default async function ReportDetailPage({
                 </td>
               )}
             </tr>
-            {internalMinutes > 0 && (
-              <tr className="border-t border-neutral-100 text-neutral-500">
-                <td className="py-1.5">Internal (hidden from client)</td>
-                <td className="py-1.5 text-right">{minutesToHours(internalMinutes)} h</td>
+            {pendingMinutes > 0 && (
+              <tr className="border-t border-neutral-100 text-amber-700">
+                <td className="py-1.5">Pending client review</td>
+                <td className="py-1.5 text-right">{minutesToHours(pendingMinutes)} h</td>
                 {rate != null && (
                   <td className="py-1.5 text-right w-28">
-                    {formatCzk(internalCost)}
+                    {formatCzk(minutesToCzk(pendingMinutes, rate))}
                   </td>
                 )}
               </tr>
@@ -288,6 +296,17 @@ export default async function ReportDetailPage({
                 )}
               </tr>
             )}
+            {internalMinutes > 0 && (
+              <tr className="border-t border-neutral-100 text-neutral-500">
+                <td className="py-1.5">Internal (hidden from client)</td>
+                <td className="py-1.5 text-right">{minutesToHours(internalMinutes)} h</td>
+                {rate != null && (
+                  <td className="py-1.5 text-right w-28">
+                    {formatCzk(internalCost)}
+                  </td>
+                )}
+              </tr>
+            )}
           </tbody>
         </table>
         <div className="mt-4 pt-3 border-t border-neutral-200">
@@ -298,7 +317,19 @@ export default async function ReportDetailPage({
         </div>
       </section>
 
-      <RejectedItemsCard
+      <ItemBreakdownCard
+        title="Pending client review"
+        tone="pending"
+        helperText="Excluded from the invoice total above until the client approves them."
+        items={pendingItems}
+        hourlyRateCzk={rate}
+        jiraBaseUrl={jiraBaseUrl}
+      />
+
+      <ItemBreakdownCard
+        title="Rejected by client"
+        tone="rejected"
+        helperText="Excluded from the invoice total above. Listed here for visibility."
         items={rejectedItems}
         hourlyRateCzk={rate}
         jiraBaseUrl={jiraBaseUrl}

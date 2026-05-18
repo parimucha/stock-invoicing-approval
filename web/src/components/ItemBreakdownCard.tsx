@@ -1,7 +1,7 @@
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { JiraLink } from "@/components/JiraLink";
 
-export type RejectedItem = {
+export type BreakdownItem = {
   id: number;
   jiraKey: string | null;
   summary: string;
@@ -9,26 +9,49 @@ export type RejectedItem = {
   reviewerComment: string | null;
 };
 
+type Tone = "rejected" | "pending";
+
+const TONE_STYLES: Record<Tone, { border: string; title: string }> = {
+  rejected: {
+    border: "border-red-200",
+    title: "text-red-900",
+  },
+  pending: {
+    border: "border-amber-200",
+    title: "text-amber-900",
+  },
+};
+
 type Props = {
-  items: RejectedItem[];
+  title: string;
+  tone: Tone;
+  helperText?: string;
+  items: BreakdownItem[];
   hourlyRateCzk: number | null;
   jiraBaseUrl: string | null;
 };
 
-// Rejected items are excluded from invoice totals (consistent with how
-// `internal` items are excluded) and surfaced here so the reviewer and
-// admin can both see exactly what's being dropped from the invoice and
-// why. Renders nothing when there's nothing rejected.
-export function RejectedItemsCard({ items, hourlyRateCzk, jiraBaseUrl }: Props) {
+// Per-item card for buckets of work excluded from invoice totals (rejected
+// by client, or still pending their review). Renders nothing when empty so
+// callers can drop two of these in without conditional wrappers.
+export function ItemBreakdownCard({
+  title,
+  tone,
+  helperText,
+  items,
+  hourlyRateCzk,
+  jiraBaseUrl,
+}: Props) {
   if (items.length === 0) return null;
 
   const totalMinutes = items.reduce((s, i) => s + i.workedMinutes, 0);
   const totalCost = minutesToCzk(totalMinutes, hourlyRateCzk);
+  const styles = TONE_STYLES[tone];
 
   return (
-    <section className="bg-white border border-red-200 rounded-lg p-5">
+    <section className={`bg-white border ${styles.border} rounded-lg p-5`}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-lg font-semibold text-red-900">Rejected by client</h2>
+        <h2 className={`text-lg font-semibold ${styles.title}`}>{title}</h2>
         <span className="text-sm text-neutral-600">
           {items.length} {items.length === 1 ? "item" : "items"} ·{" "}
           <span className="font-medium text-neutral-800">
@@ -44,9 +67,9 @@ export function RejectedItemsCard({ items, hourlyRateCzk, jiraBaseUrl }: Props) 
           )}
         </span>
       </div>
-      <p className="mt-1 text-xs text-neutral-500">
-        Excluded from the invoice totals above. Listed here for visibility.
-      </p>
+      {helperText && (
+        <p className="mt-1 text-xs text-neutral-500">{helperText}</p>
+      )}
 
       <table className="mt-4 w-full text-sm">
         <tbody>

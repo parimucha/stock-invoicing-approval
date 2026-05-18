@@ -5,7 +5,7 @@ import type { Project, ReportItem } from "@prisma/client";
 
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
-import { RejectedItemsCard } from "@/components/RejectedItemsCard";
+import { ItemBreakdownCard } from "@/components/ItemBreakdownCard";
 import { ItemCard } from "./ItemCard";
 
 type ItemWithAssignments = ReportItem & {
@@ -52,22 +52,32 @@ export function ReviewItems({
     setAssignments((prev) => ({ ...prev, [itemId]: next }));
   }, []);
 
-  // Rejected items are excluded from invoice totals, per-project buckets,
-  // and the PM-share cap — we don't bill for them. They still render in
-  // their normal project group below (with the red rejected card border)
-  // and are summarized in a dedicated RejectedItemsCard.
+  // Only items the reviewer has explicitly approved contribute to invoice
+  // totals, per-project buckets, and the PM-share cap. Pending items haven't
+  // been signed off on yet; rejected items aren't being billed. Both still
+  // render in their normal project group below (cards keep their existing
+  // amber-ish / red borders) and each gets a dedicated summary card so the
+  // reviewer sees exactly what's in / out at any moment.
+  const pendingItems = useMemo(
+    () => items.filter((i) => i.approval === "pending"),
+    [items],
+  );
   const rejectedItems = useMemo(
     () => items.filter((i) => i.approval === "rejected"),
     [items],
   );
-  const billable = useMemo(
-    () => items.filter((i) => i.approval !== "rejected"),
+  const approvedItems = useMemo(
+    () => items.filter((i) => i.approval === "approved"),
     [items],
   );
 
   const totalMinutes = useMemo(
-    () => billable.reduce((s, i) => s + i.workedMinutes, 0),
-    [billable],
+    () => approvedItems.reduce((s, i) => s + i.workedMinutes, 0),
+    [approvedItems],
+  );
+  const pendingMinutes = useMemo(
+    () => pendingItems.reduce((s, i) => s + i.workedMinutes, 0),
+    [pendingItems],
   );
   const rejectedMinutes = useMemo(
     () => rejectedItems.reduce((s, i) => s + i.workedMinutes, 0),
@@ -75,16 +85,16 @@ export function ReviewItems({
   );
   const pmMinutes = useMemo(
     () =>
-      billable.reduce(
+      approvedItems.reduce(
         (s, i) => (i.source === "project_management" ? s + i.workedMinutes : s),
         0,
       ),
-    [billable],
+    [approvedItems],
   );
   const buckets = useMemo(() => {
     const b: Record<string, number> = { Unassigned: 0 };
     for (const p of projects) b[p.name] = 0;
-    for (const it of billable) {
+    for (const it of approvedItems) {
       const assigned = assignments[it.id] ?? [];
       if (assigned.length === 0) {
         b.Unassigned += it.workedMinutes;
@@ -97,7 +107,7 @@ export function ReviewItems({
       }
     }
     return b;
-  }, [billable, assignments, projects]);
+  }, [approvedItems, assignments, projects]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -167,11 +177,24 @@ export function ReviewItems({
         buckets={buckets}
         totalMinutes={totalMinutes}
         pmMinutes={pmMinutes}
+        pendingMinutes={pendingMinutes}
         rejectedMinutes={rejectedMinutes}
         hourlyRateCzk={hourlyRateCzk}
       />
 
-      <RejectedItemsCard
+      <ItemBreakdownCard
+        title="Pending your review"
+        tone="pending"
+        helperText="Excluded from the invoice totals above until you approve them."
+        items={pendingItems}
+        hourlyRateCzk={hourlyRateCzk}
+        jiraBaseUrl={jiraBaseUrl}
+      />
+
+      <ItemBreakdownCard
+        title="Rejected by client"
+        tone="rejected"
+        helperText="Excluded from the invoice totals above. Listed here for visibility."
         items={rejectedItems}
         hourlyRateCzk={hourlyRateCzk}
         jiraBaseUrl={jiraBaseUrl}
@@ -233,12 +256,14 @@ function InvoiceOverview({
   buckets,
   totalMinutes,
   pmMinutes,
+  pendingMinutes,
   rejectedMinutes,
   hourlyRateCzk,
 }: {
   buckets: Record<string, number>;
   totalMinutes: number;
   pmMinutes: number;
+  pendingMinutes: number;
   rejectedMinutes: number;
   hourlyRateCzk: number | null;
 }) {
@@ -301,6 +326,16 @@ function InvoiceOverview({
             Total {minutesToHours(totalMinutes)} h
             {totalCost != null && <> · {formatCzk(totalCost)}</>}
           </span>
+          {pendingMinutes > 0 && (
+            <>
+              <span className="text-neutral-300" aria-hidden="true">
+                ·
+              </span>
+              <span className="text-amber-700 font-medium">
+                {minutesToHours(pendingMinutes)} h pending
+              </span>
+            </>
+          )}
           {rejectedMinutes > 0 && (
             <>
               <span className="text-neutral-300" aria-hidden="true">
@@ -323,8 +358,9 @@ function InvoiceOverview({
     >
       <h2 className="text-lg font-semibold mb-3">Invoice overview</h2>
       <p className="text-sm text-neutral-600 mb-3">
-        Hours per project based on current assignments. Items assigned to multiple projects
-        are split evenly.
+        Hours per project for items you&apos;ve <strong>approved</strong>, with
+        any multi-project assignments split evenly. Pending and rejected items
+        are listed below and don&apos;t count toward the total until approved.
       </p>
       <table className="w-full text-sm">
         <tbody>
