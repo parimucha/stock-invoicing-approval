@@ -83,10 +83,12 @@ Domains** and point DNS at Vercel. HSTS is applied automatically.
 
 ## Observability
 
-- Runtime logs: Vercel dashboard → Project → Logs.
+- Runtime logs: Vercel dashboard → Project → Logs, or `vercel logs <url>`
+  from the CLI.
 - Performance: `@vercel/speed-insights` is wired in via
-  `web/src/app/layout.tsx`. Web Vitals land on the project's Speed
-  Insights page.
+  `web/src/app/layout.tsx` but loaded only when `process.env.VERCEL` is
+  set, so local dev doesn't try to require the module. Web Vitals land
+  on the project's Speed Insights page.
 - Errors in server actions bubble up to the client as error messages —
   keep messages informative without leaking internals (they're thrown
   to an authenticated admin in most paths).

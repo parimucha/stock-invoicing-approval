@@ -112,17 +112,35 @@ review (Stock)  │        └────┬─────┘                 
   `pmNotes` are concatenated.
 - Items marked `internal = true` are excluded server-side from the review
   page query and from both invoice previews client-side.
+- Only items with `approval = "approved"` count toward the invoice total,
+  per-project buckets, and PM share. Pending and rejected are surfaced
+  separately and excluded from the math. Internal still wins over
+  approval state (internal-and-rejected counts as internal) so the
+  categorization stays non-overlapping.
 - Project assignments are truncated and rebuilt on each reviewer save of
   an item — the simplest way to keep "tick = on" / "untick = off" honest.
+- The admin "Project group" action (`updateItemGroup`) writes both
+  `suggestedProjects` and `ProjectAssignment` in one transaction. Earlier
+  drafts wrote only the suggestion, which left items visually under a
+  group while contributing zero to that group's bucket — the bug that
+  produced the orphan invoice rows in early reports.
+- Server gate: `saveItem` rejects `approval = "approved"` with zero
+  `projectIds`. The client UI also disables the Approved radio in that
+  case, but the server is the authoritative check.
 
 ## Migrations
 
-Migrations live in `web/prisma/migrations/`. The two changes since `init`:
+Migrations live in `web/prisma/migrations/`. Since the initial schema
+(`20260417155426_init`):
 
-| migration                        | what                                       |
-|----------------------------------|--------------------------------------------|
-| `20260419120000_add_porta_notes` | `ReportItem.portaNotes` (nullable TEXT)    |
-| `20260419130000_add_internal_flag` | `ReportItem.internal` (BOOL, default false) |
+| migration                                       | what                                                |
+|-------------------------------------------------|-----------------------------------------------------|
+| `20260419120000_add_porta_notes`                | `ReportItem.portaNotes` (nullable TEXT)             |
+| `20260419130000_add_internal_flag`              | `ReportItem.internal` (BOOL, default false)         |
+| `20260504_add_german_pimcore_project`           | seeds the German Pimcore project row                |
+| `20260504_add_hourly_rate`                      | `Report.hourlyRateCzk` (nullable INT)               |
+| `20260507_add_slovak_and_sap_spirit_variants`   | seeds Slovak Pimcore + four country SAP Spirit rows |
+| `20260507_add_total_worked_minutes`             | `ReportItem.totalWorkedMinutes` (nullable INT)      |
 
 Vercel runs `prisma migrate deploy` as part of every `build` — see
 [deployment.md](deployment.md).

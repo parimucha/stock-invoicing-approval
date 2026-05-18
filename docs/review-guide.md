@@ -24,7 +24,11 @@ reviewer permission on that one report.
 │         status badge                                   │
 ├────────────────────────────────────────────────────────┤
 │ Invoice overview (sticky, collapses on scroll past)    │
-│   per-project totals  ·  Total  ·  PM share vs 20%     │
+│   per-project totals · Total · Approval breakdown bar  │
+│   · PM share vs 20%                                    │
+├────────────────────────────────────────────────────────┤
+│ Pending your review (amber card, if any)               │
+│ Rejected by client  (red card, if any)                 │
 ├────────────────────────────────────────────────────────┤
 │ Filter bar (search, status pills, source, sort)        │
 ├────────────────────────────────────────────────────────┤
@@ -42,17 +46,40 @@ reviewer permission on that one report.
 ## Invoice overview
 
 Sticky at the top. Collapses to a one-line bar when you scroll past it
-(per-project hours, PM share, total). Re-expands when you scroll back to
-the top. Rows:
+(per-project hours, PM share, total, plus pending/rejected hour badges
+when non-zero). Re-expands when you scroll back to the top.
+
+**Only items you've explicitly approved count toward the totals.**
+Pending and rejected items are excluded — they get their own cards
+directly below the overview. Approving items is how you build up the
+invoice; a freshly-opened report shows Total = 0 until you start
+approving.
+
+Rows:
 
 - **Unassigned + one row per project** (Czech / French / German / Slovak
   Pimcore, SAP Spirit - general, and the four country-specific SAP Spirit
-  variants) — per-project totals. An item assigned to multiple projects is
-  split evenly across them.
-- **Total** — sum of all worked minutes in the report (excluding items
-  that PORTA marked internal; those don't reach the review page).
-- **PM share** — percent of invoiceable time that's project management.
-  Green under 20%, red over.
+  variants) — per-project totals from approved items. Items assigned to
+  multiple projects are split evenly.
+- **Total** — sum of approved worked minutes.
+- **Approval breakdown bar** — at-a-glance stacked bar of all logged
+  hours split into Approved (green) · Pending (amber) · Rejected (red),
+  with hours / percent / cost per segment.
+- **PM share** — percent of invoiceable (approved-only) time that's
+  project management. Green under 20%, red over.
+
+## Pending and rejected sections
+
+Two cards directly below the invoice overview. Each lists items with
+JIRA link, summary, hours, cost, and your comment (if any).
+
+- **Pending your review** (amber) — items you haven't approved or
+  rejected yet. They don't bill until you approve.
+- **Rejected by client** (red) — items you rejected. Excluded from the
+  invoice; listed here so you and PORTA can see what's being dropped.
+
+Both cards disappear once empty, so a fully-reviewed report shows just
+the invoice overview.
 
 ## Item card
 
@@ -90,6 +117,11 @@ change. A small "Saved" indicator confirms persistence.
 
 The card background is tinted green when approved, red when rejected,
 white when pending.
+
+> **Note:** The **Approved** radio is disabled when no projects are
+> ticked — approved items must bill somewhere. If you untick the last
+> project on an already-approved item, approval auto-reverts to Pending
+> to keep state consistent.
 
 ## Filters and sort
 
@@ -134,5 +166,10 @@ automatically. The overall note has an explicit "Save note" button.
   you've signed off. Use **Reopen for review** in the Sign off section
   to make changes again.
 - **Invoice overview looks wrong** — check that every item you care
-  about has the right projects ticked. Items with no projects ticked
-  land in **Unassigned** and won't be invoiced against any project.
+  about is **approved** (pending and rejected items don't count) and
+  has the right projects ticked. Items with no projects ticked land in
+  **Unassigned**; the **Approved** radio is blocked in that case so you
+  can't accidentally invoice work to nowhere.
+- **Total shows 0 h on a fresh report** — that's expected. Only items
+  you've explicitly approved count toward the Total. Approve items as
+  you walk through them.

@@ -22,6 +22,16 @@ layout gate is not the only line of defense.
 Per-item, visible only while `status === "draft"`. Expand via the
 **Edit** pill in the rightmost column.
 
+### Project group
+
+The single-select dropdown at the top of the edit panel. Sets both the
+section the reviewer sees the item under **and** the project it bills
+to — the two are kept in sync. Picking a project overwrites any prior
+multi-project assignment the reviewer may have set (matches what
+clicking a single-project dropdown implies); picking Unassigned clears
+all assignments. The reviewer can still re-tick multiple projects on
+their side to split.
+
 ### PORTA notes
 
 Free-text field, available on **every** item (JIRA or PM). Saves a blue
@@ -70,12 +80,71 @@ Semantics: internal items are **not invoiced to the client**. If you
 need an item hidden but still billable, that's a different feature —
 not supported today.
 
+## Add item manually
+
+Collapsible section above the items table, visible while `status ===
+"draft"`. Use it for work that was logged outside Productive (e.g. a
+fixed-fee add-on) or for any line item the ingest pipeline missed.
+Fields: summary, hours worked (decimal), optional JIRA key, optional
+PORTA notes, optional suggested projects, internal flag. Creates a
+ReportItem plus matching ProjectAssignment rows in one transaction.
+
+## Manual hourly rate
+
+Optional. Set CZK/hour on the report; costs round up to whole crowns and
+appear alongside every hours figure for that report (invoice preview,
+per-item rows, lifetime totals, reviewer's overview). Leave blank to
+hide costs entirely. Saved per-report so different months can use
+different rates.
+
+## Refresh from upstream
+
+Two non-destructive buttons above the invoice preview. Both touch a
+single field each — admin/reviewer edits are untouched.
+
+- **Refresh lifetime totals** — hits Productive directly for every
+  JIRA-linked item, recomputes the lifetime "X h total" reference shown
+  next to each item's monthly hours. Targeted by JIRA key (one query per
+  key, 8-way concurrency, bounded so it fits a Hobby 10s budget for a
+  typical 30–100-key report). Requires the `PRODUCTIVE_*` env vars; if
+  not set, the button surfaces a config error when clicked.
+- **Refresh JIRA statuses** — hits the Atlassian REST API for every
+  JIRA-linked item (batched JQL `key in (…)`, 50 keys/batch, only the
+  `status` field). Routes through `api.atlassian.com/ex/jira/{cloudId}/…`
+  rather than the site URL because scoped API tokens silently return
+  empty results from the site URL. Requires `JIRA_BASE_URL`,
+  `JIRA_API_EMAIL`, `JIRA_API_TOKEN`.
+
+Either button reports `N updated · M unchanged · K not in {Productive,JIRA}`
+after the run.
+
 ## Invoice preview
 
-At the top of the report detail. Computed from the current project
-assignments, excluding internal items, even-split for items assigned to
-multiple projects. The **PM share** bar shows what fraction of
-invoiceable time is PM work; green under 20%, red over.
+Below the refresh + hourly rate sections. Computed from the current
+project assignments, even-split for items assigned to multiple projects.
+**Only items the client has explicitly approved are counted** — items
+still pending review, rejected by the client, and marked internal each
+get their own row below the invoiceable total but contribute zero.
+
+Above the per-project table:
+
+- **Approval breakdown bar** — stacked horizontal segment bar with hours
+  / percent / cost for each of Approved · Pending · Rejected · Internal,
+  summing to total logged hours. Same colour key as the rest of the
+  page.
+- **PM share** — fraction of *invoiceable* (approved-only) time that's
+  PM work; green under 20%, red over.
+
+Below the preview:
+
+- **Pending client review** card — per-item breakdown of pending items
+  (JIRA key, summary, hours, cost, reviewer comment if any). Excluded
+  from the invoiceable total until approved.
+- **Rejected by client** card — same shape, red instead of amber. Also
+  excluded from the invoiceable total.
+
+Both cards render nothing when empty, so a clean report shows just the
+invoice preview.
 
 ## Status actions
 

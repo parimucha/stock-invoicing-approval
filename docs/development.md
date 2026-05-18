@@ -43,14 +43,41 @@ From `web/.env.example`:
 | `DIRECT_URL`       | Prisma (migrations)          | Same as DATABASE_URL when using plain Postgres. Vercel Postgres needs a separate direct URL to bypass the connection pooler during migrations. |
 | `ADMIN_PASSWORD`   | `signInAdmin`                | PORTA admin password                        |
 | `SESSION_SECRET`   | `signInAdmin` / `isAdmin`    | HMAC-SHA256 key for the session cookie. Any long random string. |
-| `JIRA_BASE_URL`    | `JiraLink` rendering         | Optional. e.g. `https://your-org.atlassian.net`. When set, JIRA keys in the UI become clickable links. |
+| `JIRA_BASE_URL`    | `JiraLink` rendering + REST  | Optional. e.g. `https://your-org.atlassian.net`. Links JIRA keys in the UI, and base for the "Refresh JIRA statuses" admin button (which routes through `api.atlassian.com/ex/jira/{cloudId}/…`). |
+| `JIRA_API_EMAIL`   | Refresh JIRA statuses        | Optional. Atlassian account email paired with the API token. |
+| `JIRA_API_TOKEN`   | Refresh JIRA statuses        | Optional. Atlassian API token (from <https://id.atlassian.com/manage-profile/security/api-tokens>). Scoped tokens are fine; needs `read:jira-work` + `read:issue:jira`. |
+| `PRODUCTIVE_API_TOKEN` | Refresh lifetime totals  | Optional. Same value as the ingestion `.env`. |
+| `PRODUCTIVE_ORG_ID`    | Refresh lifetime totals  | Optional. Same value as the ingestion `.env`. |
+| `PRODUCTIVE_STOCK_COMPANY_ID` | Refresh lifetime totals | Optional. Stock's company id in Productive. |
 
 For ingestion scripts (root-level `.env`):
 
-| var                   | notes                                |
-|-----------------------|--------------------------------------|
-| `PRODUCTIVE_API_TOKEN`| Productive REST API token            |
-| `PRODUCTIVE_ORG_ID`   | Productive organization id           |
+| var                          | notes                                  |
+|------------------------------|----------------------------------------|
+| `PRODUCTIVE_API_TOKEN`       | Productive REST API token              |
+| `PRODUCTIVE_ORG_ID`          | Productive organization id             |
+| `PRODUCTIVE_STOCK_COMPANY_ID`| Used by `pull-productive-totals.js`    |
+
+## Local debugging against the production database
+
+For chasing prod-only bugs without re-creating data on a local DB:
+
+```bash
+cd web
+vercel env pull .env.local --environment=production
+npm run dev
+```
+
+Next.js loads `.env.local` ahead of `.env`, so `DATABASE_URL`, magic
+tokens, and admin password become the production values. Useful for
+reproducing bugs that depend on real reports or for verifying server
+actions before pushing. Any write you make in the UI hits prod — treat
+every Save / Mark / Refresh button as a real production write. Delete
+`web/.env.local` when you're done.
+
+The `scripts/check-jira-api.js` standalone smoke test reuses the same
+env to verify the "Refresh JIRA statuses" path end-to-end without
+booting Next.
 
 ## Useful commands
 
@@ -110,16 +137,20 @@ web/
 │   │       ├── ReviewItems.tsx client wrapper with filter/sort + invoice overview
 │   │       └── ItemCard.tsx
 │   ├── components/
+│   │   ├── ApprovalBreakdownBar.tsx  stacked bar of approved/pending/rejected/internal
 │   │   ├── BudgetBar.tsx
-│   │   ├── JiraLink.tsx
-│   │   ├── HelpButton.tsx
 │   │   ├── ConfirmForm.tsx
+│   │   ├── HelpButton.tsx
+│   │   ├── ItemBreakdownCard.tsx     shared pending/rejected detail card
+│   │   ├── JiraLink.tsx
+│   │   ├── JiraStatusBadge.tsx       shared status pill used on both sides
 │   │   ├── PendingButton.tsx
 │   │   └── PmShareIndicator.tsx
 │   └── lib/
 │       ├── prisma.ts           singleton client
 │       ├── auth.ts             cookie + requireAdmin + magic token
-│       ├── jira.ts             base URL helpers
+│       ├── jira.ts             base URL + REST client (cloudId-routed)
+│       ├── productive.ts       REST client for lifetime totals refresh
 │       ├── format.ts           minutes/seconds → hours formatting
 │       └── report-schema.ts    JSON upload validator
 ├── next.config.ts
@@ -144,3 +175,23 @@ There's no test suite. Changes are verified by running the app against a
 seeded local DB and exercising the flow. For UI-affecting changes on a
 real month's data, reset the report with the admin "Reset report" button
 after each run.
+
+## Local dev gotcha: tailwindcss / speed-insights resolve errors
+
+When the repo root has its own `package.json` + `node_modules` (the MCP
+server lives there), Next 16 / Turbopack and Tailwind v4 mis-infer the
+workspace root and walk up from `web/` into the parent's `node_modules`
+— where neither `tailwindcss` nor `@vercel/speed-insights/next` exist.
+Workarounds already wired in:
+
+- Root `package.json` has `tailwindcss` as a devDep, so the package is
+  resolvable from the parent dir.
+- `web/postcss.config.mjs` pins `base` to `web/` explicitly.
+- `web/src/app/globals.css` uses `@import "tailwindcss" source("../..")`
+  to pin Tailwind v4's class scanner to `web/`.
+- `web/src/app/layout.tsx` loads `@vercel/speed-insights/next` via a
+  dynamic import gated on `process.env.VERCEL`, so locally it's never
+  required.
+- `web/next.config.ts` pins `turbopack.root` to `web/` (via
+  `import.meta.url`). Do **not** also set `outputFileTracingRoot` — that
+  breaks the Vercel build adapter.
