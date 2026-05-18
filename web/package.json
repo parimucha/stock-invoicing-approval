@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@sentry/nextjs": "^10.53.1",
     "@vercel/speed-insights": "^2.0.0",
     "next": "16.2.4",
     "react": "19.2.4",
