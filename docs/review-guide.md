@@ -16,6 +16,12 @@ Access is via a magic link, one per monthly report. No account, no
 password. The token is 192 random bits; anyone with the link has full
 reviewer permission on that one report.
 
+Stock also gets a separate **client dashboard** URL
+(`/client/<token>`) that lists every non-draft report with its status
+and totals, with links straight into each report. Bookmark the
+dashboard once and revisit instead of tracking per-report links —
+the per-report links keep working either way.
+
 ## Page layout
 
 ```

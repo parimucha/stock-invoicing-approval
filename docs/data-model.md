@@ -1,9 +1,23 @@
 # Data model
 
-All persistent state lives in five tables defined in
+All persistent state lives in six tables defined in
 [`web/prisma/schema.prisma`](../web/prisma/schema.prisma).
 
 ## Entities
+
+### `Client` (tenant)
+
+One row per client tenant. Seeded by
+[`web/prisma/seed.ts`](../web/prisma/seed.ts) with a single "Stock"
+row whose `magicToken` (192 random bits, base64url) backs the
+`/client/<token>` dashboard listing every non-draft report. The
+token is generated on first seed and preserved on re-runs — to
+rotate, delete the row by hand.
+
+Reports aren't currently linked to a specific client (no `clientId`
+column on `Report`), so the dashboard returns every non-draft report
+regardless. The table is shaped to allow per-client filtering later
+without a schema rewrite.
 
 ### `Project` (lookup)
 
@@ -69,6 +83,28 @@ project-management (`source = project_management`, no JIRA key).
 Many-to-many between items and projects. Composite primary key
 `(itemId, projectId)`. Edited through the review UI; "Reset report"
 rebuilds this table from `suggestedProjects`.
+
+### `Client`
+
+One row per client tenant. Backs the per-client dashboard at
+`/client/<magicToken>` that lists every non-draft report with status
+and totals.
+
+| column       | notes                                                       |
+|--------------|-------------------------------------------------------------|
+| `id`         | cuid                                                        |
+| `name`       | unique, human-readable                                      |
+| `magicToken` | 192-bit base64url, unique index                             |
+| `createdAt`  | timestamp                                                   |
+
+Reports aren't linked to a specific client yet — the dashboard
+surfaces every non-draft `Report` regardless of which client opened
+it. Wire a `clientId` foreign key onto `Report` if/when a second
+client needs scoped access.
+
+The seed creates one row (`Stock`) on first run and **never rotates
+the token across re-seeds** (the URL goes out once; a re-run should
+not invalidate it). Delete the row to force a fresh token.
 
 ## Report lifecycle
 
@@ -141,6 +177,8 @@ Migrations live in `web/prisma/migrations/`. Since the initial schema
 | `20260504_add_hourly_rate`                      | `Report.hourlyRateCzk` (nullable INT)               |
 | `20260507_add_slovak_and_sap_spirit_variants`   | seeds Slovak Pimcore + four country SAP Spirit rows |
 | `20260507_add_total_worked_minutes`             | `ReportItem.totalWorkedMinutes` (nullable INT)      |
+| `20260518_add_client_table`                     | `Client` (id, name, magicToken, createdAt); seeded with one "Stock" row |
+| `20260518_add_client_table`                     | new `Client` table (id, name, magicToken, createdAt) |
 
 Vercel runs `prisma migrate deploy` as part of every `build` — see
 [deployment.md](deployment.md).

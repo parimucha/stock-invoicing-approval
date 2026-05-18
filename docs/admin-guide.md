@@ -14,8 +14,28 @@ layout gate is not the only line of defense.
 3. You land on the report detail at `/admin/reports/<id>`. A magic link is
    shown at the top — copy it.
 4. **Edit** items as needed (see below).
-5. **Mark as sent** when ready. Share the magic link with Stock.
+5. **Mark as sent** when ready. Share the magic link with Stock — or just
+   tell them their dashboard now has a new row (see "Client dashboard"
+   below).
 6. Stock reviews and signs off. You come back, read comments, invoice.
+
+## Client dashboard
+
+`/admin` shows a **Client dashboards** section at the top with one URL
+per client (today: just Stock) of the form
+`/client/<magicToken>`. The dashboard lists every non-draft report with
+per-report status, approved/pending/rejected hour totals, invoiced
+cost (when the per-report hourly rate is set), and a link straight to
+that report's individual magic-link review page.
+
+Share the dashboard URL **once** per client; they bookmark it and
+revisit. Every new report you mark as sent shows up automatically.
+The per-report magic link still works directly for anyone who already
+has it — the dashboard is an entry point, not a replacement.
+
+The token is seeded once on first deploy (via `prisma/seed.ts`) and
+preserved across re-seeds — re-running the seed doesn't rotate the
+URL. To rotate, delete the `Client` row in the DB and re-seed.
 
 ## Edit panel
 

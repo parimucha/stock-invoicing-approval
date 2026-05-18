@@ -1,12 +1,21 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 
 export default async function AdminHome() {
-  const reports = await prisma.report.findMany({
-    orderBy: { label: "desc" },
-    include: { _count: { select: { items: true } }, items: { select: { workedMinutes: true } } },
-  });
+  const [reports, clients] = await Promise.all([
+    prisma.report.findMany({
+      orderBy: { label: "desc" },
+      include: { _count: { select: { items: true } }, items: { select: { workedMinutes: true } } },
+    }),
+    prisma.client.findMany({ orderBy: { name: "asc" } }),
+  ]);
+
+  const h = await headers();
+  const host = h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? "http";
+  const origin = `${proto}://${host}`;
 
   return (
     <div className="space-y-6">
@@ -19,6 +28,30 @@ export default async function AdminHome() {
           New report
         </Link>
       </div>
+
+      {clients.length > 0 && (
+        <section className="bg-white border border-neutral-200 rounded-lg p-4 space-y-3">
+          <div>
+            <h2 className="text-sm font-semibold">Client dashboards</h2>
+            <p className="text-xs text-neutral-500">
+              One link per client that lists every non-draft report with status
+              and totals. Share once — the client bookmarks it and revisits.
+            </p>
+          </div>
+          <ul className="space-y-2">
+            {clients.map((c) => (
+              <li key={c.id}>
+                <div className="text-xs font-medium text-neutral-500 uppercase tracking-wide">
+                  {c.name}
+                </div>
+                <code className="block text-xs mt-1 break-all bg-neutral-50 border border-neutral-200 rounded px-2 py-1">
+                  {origin}/client/{c.magicToken}
+                </code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="bg-white border border-neutral-200 rounded-lg overflow-hidden">
         {reports.length === 0 ? (

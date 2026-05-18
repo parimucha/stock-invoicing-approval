@@ -34,6 +34,17 @@ model Project {
   assignments ProjectAssignment[]
 }
 
+// One row per client tenant. magicToken backs the `/client/<token>`
+// dashboard listing every non-draft report. Today there's a single seeded
+// row ("Stock"); reports aren't linked to a specific client yet, so the
+// dashboard surfaces all non-draft reports regardless.
+model Client {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  magicToken String   @unique
+  createdAt  DateTime @default(now())
+}
+
 model Report {
   id                   Int          @id @default(autoincrement())
   label                String       @unique

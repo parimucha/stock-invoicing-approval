@@ -84,7 +84,8 @@ proficio-mcp/
 └── web/                       Next.js + Prisma app deployed to Vercel
     ├── prisma/
     ├── src/app/admin/         PORTA routes
-    ├── src/app/review/[token]/ Stock routes
+    ├── src/app/client/[token]/ Stock dashboard listing all reports
+    ├── src/app/review/[token]/ Stock per-report review routes
     └── src/components/        shared UI (BudgetBar, JiraLink, HelpButton, …)
 ```
 

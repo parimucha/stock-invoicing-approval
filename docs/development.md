@@ -131,6 +131,8 @@ web/
 │   │   │       ├── page.tsx
 │   │   │       ├── actions.ts  merge / notes / internal / summary / reset
 │   │   │       └── AdminItemsTable.tsx
+│   │   ├── client/[token]/
+│   │   │   └── page.tsx        client dashboard (lists every non-draft report)
 │   │   └── review/[token]/
 │   │       ├── page.tsx        magic-link landing
 │   │       ├── actions.ts      saveItem / signOff / reopenReview
