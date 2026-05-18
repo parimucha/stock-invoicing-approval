@@ -24,6 +24,11 @@ happens on every push to `main`.
      (optional) — required only by the "Refresh lifetime totals" button on
      the admin report page. Without them the button is still visible but
      surfaces a config error when clicked. Same values as the local `.env`.
+   - `JIRA_API_EMAIL`, `JIRA_API_TOKEN` (optional) — required only by the
+     "Refresh JIRA statuses" button on the admin report page. Pair with
+     `JIRA_BASE_URL`; the token is an Atlassian API token from
+     <https://id.atlassian.com/manage-profile/security/api-tokens>. Without
+     them the button surfaces a config error when clicked.
 5. Trigger a deploy. The first build runs `prisma migrate deploy` against
    the pooled URL, which creates the schema.
 6. Run the seed once (one-off, from your machine):

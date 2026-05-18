@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth";
 import { fetchLifetimeMinutesForKeys } from "@/lib/productive";
+import { fetchJiraStatusesForKeys } from "@/lib/jira";
 
 export type RefreshTotalsResult =
   | {
@@ -12,6 +13,16 @@ export type RefreshTotalsResult =
       updated: number;
       unchanged: number;
       missingFromProductive: number;
+      keysQueried: number;
+    }
+  | { ok: false; error: string };
+
+export type RefreshStatusesResult =
+  | {
+      ok: true;
+      updated: number;
+      unchanged: number;
+      missingFromJira: number;
       keysQueried: number;
     }
   | { ok: false; error: string };
@@ -386,6 +397,78 @@ export async function refreshLifetimeTotals(
       updated,
       unchanged,
       missingFromProductive,
+      keysQueried: jiraKeys.length,
+    };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// Refreshes the JIRA status text for every JIRA-linked item by hitting the
+// Atlassian REST API directly. Only ReportItem.jiraStatus is touched — admin
+// and reviewer edits stay put.
+export async function refreshJiraStatuses(
+  _prev: RefreshStatusesResult | null,
+  formData: FormData,
+): Promise<RefreshStatusesResult> {
+  try {
+    await requireAdmin();
+    const reportId = Number(formData.get("reportId"));
+    if (!reportId) return { ok: false, error: "Missing report id." };
+
+    const items = await prisma.reportItem.findMany({
+      where: { reportId, source: "jira", jiraKey: { not: null } },
+      select: { id: true, jiraKey: true, jiraStatus: true },
+    });
+    const jiraKeys = [...new Set(items.map((i) => i.jiraKey).filter((k): k is string => !!k))];
+    if (jiraKeys.length === 0) {
+      return { ok: true, updated: 0, unchanged: 0, missingFromJira: 0, keysQueried: 0 };
+    }
+
+    const statusByKey = await fetchJiraStatusesForKeys(jiraKeys);
+
+    let unchanged = 0;
+    let missingFromJira = 0;
+    const updates: Array<{ id: number; status: string }> = [];
+
+    for (const item of items) {
+      const key = item.jiraKey;
+      if (!key) continue;
+      const status = statusByKey.get(key);
+      if (status == null) {
+        missingFromJira += 1;
+        continue;
+      }
+      if (item.jiraStatus === status) {
+        unchanged += 1;
+        continue;
+      }
+      updates.push({ id: item.id, status });
+    }
+
+    if (updates.length > 0) {
+      await prisma.$transaction(
+        updates.map((u) =>
+          prisma.reportItem.update({
+            where: { id: u.id },
+            data: { jiraStatus: u.status },
+          }),
+        ),
+      );
+    }
+
+    const report = await prisma.report.findUnique({
+      where: { id: reportId },
+      select: { magicToken: true },
+    });
+    revalidatePath(`/admin/reports/${reportId}`);
+    if (report) revalidatePath(`/review/${report.magicToken}`);
+
+    return {
+      ok: true,
+      updated: updates.length,
+      unchanged,
+      missingFromJira,
       keysQueried: jiraKeys.length,
     };
   } catch (err) {

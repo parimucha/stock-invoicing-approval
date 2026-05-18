@@ -6,6 +6,7 @@ import type { ReportItem } from "@prisma/client";
 import { formatCzk, minutesToCzk, minutesToHours, secondsToHours, diffHours } from "@/lib/format";
 import { BudgetBar } from "@/components/BudgetBar";
 import { JiraLink } from "@/components/JiraLink";
+import { JiraStatusBadge } from "@/components/JiraStatusBadge";
 import { PendingButton } from "@/components/PendingButton";
 import {
   mergeItems,
@@ -150,7 +151,10 @@ export function AdminItemsTable({
                       )}
                     </td>
                     <td className="px-3 py-2">
-                      {it.jiraIssuetype && <IssueTypeBadge type={it.jiraIssuetype} />}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {it.jiraIssuetype && <IssueTypeBadge type={it.jiraIssuetype} />}
+                        {it.jiraStatus && <JiraStatusBadge status={it.jiraStatus} />}
+                      </div>
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-2 flex-wrap">

@@ -11,6 +11,7 @@ import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { AdminItemsTable, type MergeTarget } from "./AdminItemsTable";
 import { addItem, resetReport, updateHourlyRate } from "./actions";
 import { RefreshTotalsButton } from "./RefreshTotalsButton";
+import { RefreshStatusesButton } from "./RefreshStatusesButton";
 
 async function markSent(formData: FormData) {
   "use server";
@@ -171,15 +172,25 @@ export default async function ReportDetailPage({
         </div>
       </section>
 
-      <section className="bg-white border border-neutral-200 rounded-lg p-4 space-y-3">
+      <section className="bg-white border border-neutral-200 rounded-lg p-4 space-y-4">
+        <h2 className="text-sm font-semibold">Refresh from upstream</h2>
         <div>
-          <h2 className="text-sm font-semibold mb-1">Lifetime totals</h2>
+          <h3 className="text-xs font-medium text-neutral-700 mb-1">Lifetime totals</h3>
           <p className="text-xs text-neutral-500 mb-2">
             Pulls each JIRA ticket's total worked time across all of Stock's
             history from Productive and updates the "h total" reference shown
             on every JIRA item. Safe to re-run — only that one field changes.
           </p>
           <RefreshTotalsButton reportId={report.id} />
+        </div>
+        <div className="pt-3 border-t border-neutral-100">
+          <h3 className="text-xs font-medium text-neutral-700 mb-1">JIRA statuses</h3>
+          <p className="text-xs text-neutral-500 mb-2">
+            Pulls the current status of every JIRA-linked ticket from
+            Atlassian and updates the status badge shown on each item. Safe
+            to re-run — only that one field changes.
+          </p>
+          <RefreshStatusesButton reportId={report.id} />
         </div>
       </section>
 
