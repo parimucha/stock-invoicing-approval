@@ -7,6 +7,7 @@ import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { PmShareIndicator } from "@/components/PmShareIndicator";
 import { ApprovalBreakdownBar } from "@/components/ApprovalBreakdownBar";
 import { ItemBreakdownCard } from "@/components/ItemBreakdownCard";
+import { JiraLink } from "@/components/JiraLink";
 import { ItemCard } from "./ItemCard";
 
 type ItemWithAssignments = ReportItem & {
@@ -167,21 +168,58 @@ export function ReviewItems({
     return arr;
   }, [filtered, sort]);
 
+  // Grouping follows the reviewer's live project checkboxes (assignments),
+  // not the upload-time suggestedProjects. An item assigned to N projects
+  // appears in each of those groups, with its worked time split N ways
+  // (matching the invoice overview math). Within a group, the item shows as
+  // a full editable card in its "primary" location — the lowest-sortOrder
+  // assigned project — and as a compact read-only row elsewhere. This
+  // duplicates visibility without duplicating editable state.
   const groups = useMemo(() => {
     const order = [...projects.map((p) => p.name), "Unassigned"];
-    const map = new Map<string, ItemWithAssignments[]>();
+    const projectNameById = new Map(projects.map((p) => [p.id, p.name]));
+    const map = new Map<
+      string,
+      Array<{ item: ItemWithAssignments; minutes: number; primary: boolean }>
+    >();
     for (const name of order) map.set(name, []);
+
+    // Pre-compute each item's primary project (first assigned, in sortOrder).
+    const primaryProjectNameByItem = new Map<number, string>();
     for (const it of sorted) {
-      const suggested = it.suggestedProjects as string[];
-      const firstProjectName =
-        suggested.length === 0
-          ? "Unassigned"
-          : (projects.find((p) => p.id === suggested[0])?.name ?? "Unassigned");
-      const bucket = map.get(firstProjectName) ?? map.get("Unassigned")!;
-      bucket.push(it);
+      const assigned = assignments[it.id] ?? [];
+      if (assigned.length === 0) continue;
+      for (const p of projects) {
+        if (assigned.includes(p.id)) {
+          primaryProjectNameByItem.set(it.id, p.name);
+          break;
+        }
+      }
+    }
+
+    for (const it of sorted) {
+      const assigned = assignments[it.id] ?? [];
+      if (assigned.length === 0) {
+        map.get("Unassigned")!.push({
+          item: it,
+          minutes: it.workedMinutes,
+          primary: true,
+        });
+        continue;
+      }
+      const share = it.workedMinutes / assigned.length;
+      const primaryName = primaryProjectNameByItem.get(it.id);
+      for (const pid of assigned) {
+        const projectName = projectNameById.get(pid) ?? "Unassigned";
+        map.get(projectName)?.push({
+          item: it,
+          minutes: share,
+          primary: projectName === primaryName,
+        });
+      }
     }
     return order.map((name) => ({ name, items: map.get(name) ?? [] }));
-  }, [sorted, projects]);
+  }, [sorted, projects, assignments]);
 
   return (
     <div className="space-y-6">
@@ -230,13 +268,14 @@ export function ReviewItems({
 
       {groups.map((g) => {
         if (g.items.length === 0) return null;
-        const groupMinutes = g.items.reduce((s, i) => s + i.workedMinutes, 0);
+        const groupMinutes = g.items.reduce((s, gi) => s + gi.minutes, 0);
         const groupCost = minutesToCzk(groupMinutes, hourlyRateCzk);
+        const uniqueItemCount = g.items.length;
         // Collapse fully-approved groups on a second pass so the reviewer's
         // attention lands on what still needs work. Stay expanded when the
         // user is explicitly filtering for approved — collapsing then would
         // hide exactly what they asked to see.
-        const allApproved = g.items.every((i) => i.approval === "approved");
+        const allApproved = g.items.every((gi) => gi.item.approval === "approved");
         const collapse = allApproved && status !== "approved";
         const open = groupOpenOverride[g.name] ?? !collapse;
         return (
@@ -265,7 +304,7 @@ export function ReviewItems({
               <span>
                 {g.name} · {minutesToHours(groupMinutes)} h ·{" "}
                 {groupCost != null && <>{formatCzk(groupCost)} · </>}
-                {g.items.length} {g.items.length === 1 ? "item" : "items"}
+                {uniqueItemCount} {uniqueItemCount === 1 ? "item" : "items"}
                 {collapse && (
                   <span className="ml-2 normal-case tracking-normal text-green-700 font-medium">
                     all approved ✓
@@ -274,19 +313,32 @@ export function ReviewItems({
               </span>
             </summary>
             <div className="space-y-3 mt-3">
-              {g.items.map((it) => (
-                <ItemCard
-                  key={it.id}
-                  item={it}
-                  token={token}
-                  projects={projects}
-                  locked={locked}
-                  jiraBaseUrl={jiraBaseUrl}
-                  assigned={assignments[it.id] ?? []}
-                  onAssignedChange={(next) => setItemAssignments(it.id, next)}
-                  hourlyRateCzk={hourlyRateCzk}
-                />
-              ))}
+              {g.items.map((gi) =>
+                gi.primary ? (
+                  <div key={gi.item.id} id={`item-${gi.item.id}`}>
+                    <ItemCard
+                      item={gi.item}
+                      token={token}
+                      projects={projects}
+                      locked={locked}
+                      jiraBaseUrl={jiraBaseUrl}
+                      assigned={assignments[gi.item.id] ?? []}
+                      onAssignedChange={(next) =>
+                        setItemAssignments(gi.item.id, next)
+                      }
+                      hourlyRateCzk={hourlyRateCzk}
+                    />
+                  </div>
+                ) : (
+                  <CompactItemRow
+                    key={gi.item.id}
+                    item={gi.item}
+                    splitMinutes={gi.minutes}
+                    hourlyRateCzk={hourlyRateCzk}
+                    jiraBaseUrl={jiraBaseUrl}
+                  />
+                ),
+              )}
             </div>
           </details>
         );
@@ -550,6 +602,62 @@ function FilterBar({
             : `${resultCount} of ${totalCount} items`}
         </div>
       </div>
+    </div>
+  );
+}
+
+const APPROVAL_DOT: Record<string, { bg: string; label: string }> = {
+  approved: { bg: "bg-green-500", label: "Approved" },
+  pending: { bg: "bg-amber-400", label: "Pending" },
+  rejected: { bg: "bg-red-500", label: "Rejected" },
+};
+
+function CompactItemRow({
+  item,
+  splitMinutes,
+  hourlyRateCzk,
+  jiraBaseUrl,
+}: {
+  item: ItemWithAssignments;
+  splitMinutes: number;
+  hourlyRateCzk: number | null;
+  jiraBaseUrl: string | null;
+}) {
+  const cost = minutesToCzk(splitMinutes, hourlyRateCzk);
+  const dot = APPROVAL_DOT[item.approval] ?? APPROVAL_DOT.pending;
+  return (
+    <div
+      className="flex items-center gap-3 px-3 py-2 text-sm bg-neutral-50 border border-dashed border-neutral-300 rounded"
+      title="Shared with another project — edit on the original card"
+    >
+      <span
+        className={`inline-block w-2 h-2 rounded-full shrink-0 ${dot.bg}`}
+        aria-label={dot.label}
+        title={dot.label}
+      />
+      <span className="font-mono text-xs text-neutral-600 shrink-0 min-w-[3rem]">
+        {item.jiraKey ? (
+          <JiraLink
+            jiraKey={item.jiraKey}
+            jiraBaseUrl={jiraBaseUrl}
+            className="hover:underline"
+          />
+        ) : (
+          <span className="text-neutral-400">PM</span>
+        )}
+      </span>
+      <span className="flex-1 truncate text-neutral-800">{item.summary}</span>
+      <span className="text-xs text-neutral-500 whitespace-nowrap shrink-0">
+        {minutesToHours(splitMinutes)} h
+        {cost != null && <> · {formatCzk(cost)}</>}
+      </span>
+      <a
+        href={`#item-${item.id}`}
+        className="text-xs text-neutral-500 hover:text-neutral-900 hover:underline shrink-0"
+        title="Jump to the editable card"
+      >
+        edit ↑
+      </a>
     </div>
   );
 }

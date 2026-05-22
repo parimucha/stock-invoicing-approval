@@ -237,7 +237,9 @@ function ReviewHelpContent() {
           </li>
           <li>
             <strong>Projects</strong> — tick the project(s) this item should
-            bill to. Multiple ticks split the hours evenly.
+            bill to. Multiple ticks split the hours evenly, and the item then
+            also appears as a read-only row in each shared project group
+            below (click <em>edit ↑</em> to jump back to the editable card).
           </li>
           <li>
             <strong>Approve / Reject / Pending</strong> — your decision per
@@ -254,7 +256,11 @@ function ReviewHelpContent() {
         <p>
           Above the items: search by key / summary / label, filter by approval
           status or source (JIRA / PM), and sort by worked hours, over- or
-          under-budget, or JIRA key.
+          under-budget, or JIRA key. The{" "}
+          <strong>Hide approved</strong> toggle is handy on a second pass to
+          focus on what still needs your attention. Project groups whose
+          items are all approved auto-collapse for the same reason — click
+          the header to expand any group.
         </p>
       </section>
 
