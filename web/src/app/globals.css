@@ -29,15 +29,6 @@ body {
   color: #171717;
 }
 
-/* Disable scroll anchoring. The review page's sticky invoice overview
-   intentionally changes height as it collapses/expands; with default scroll
-   anchoring the browser re-adjusts scroll on each height change, which
-   re-triggers the intersection observer and produces an oscillation loop. */
-html,
-body {
-  overflow-anchor: none;
-}
-
 /* Admin report table: the edit-row is a full-width secondary <tr> that
    reveals itself when the preceding row's <details> toggle is open. */
 tr.edit-row {

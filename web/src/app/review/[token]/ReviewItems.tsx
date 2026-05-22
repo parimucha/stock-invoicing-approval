@@ -368,97 +368,40 @@ function InvoiceOverview({
   rejectedMinutes: number;
   hourlyRateCzk: number | null;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  // Re-attach the observer every time React mounts a different <section>
-  // element (the conditional below renders distinct nodes for the
-  // expanded/collapsed branches). A useEffect with [] would observe the
-  // initial node forever and stop firing once that node is unmounted —
-  // visible in MS Edge as a sticky bar that gets stuck collapsed and never
-  // reflects scroll-back-to-top. Pairs with `overflow-anchor: none` in
-  // globals.css, which prevents the height-change oscillation loop.
-  const sectionRef = useCallback((el: HTMLElement | null) => {
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([entry]) => setCollapsed(entry.intersectionRatio < 1),
-      { threshold: [1], rootMargin: "-9px 0px 0px 0px" },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-
-  const pmPct = totalMinutes > 0 ? (pmMinutes / totalMinutes) * 100 : 0;
-  const pmOver = pmPct > 20;
   const totalCost = minutesToCzk(totalMinutes, hourlyRateCzk);
 
-  if (collapsed) {
-    return (
-      <section
-        ref={sectionRef}
-        className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg shadow-sm"
-      >
-        <div className="px-4 py-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-          {Object.entries(buckets).map(([name, mins]) => {
-            const cost = minutesToCzk(mins, hourlyRateCzk);
-            return (
-              <span key={name}>
-                <span className="text-neutral-500">{name}</span>{" "}
-                <span className="font-medium text-neutral-800">
-                  {minutesToHours(mins)} h
-                </span>
-                {cost != null && (
-                  <span className="text-neutral-500"> · {formatCzk(cost)}</span>
-                )}
-              </span>
-            );
-          })}
-          <span className="text-neutral-300" aria-hidden="true">
-            ·
-          </span>
-          <span
-            className={`font-medium ${pmOver ? "text-red-700" : "text-green-700"}`}
-          >
-            PM {pmPct.toFixed(1)}% {pmOver ? "⚠" : "✓"}
-          </span>
-          <span className="text-neutral-300" aria-hidden="true">
-            ·
-          </span>
-          <span className="font-semibold">
-            Total {minutesToHours(totalMinutes)} h
-            {totalCost != null && <> · {formatCzk(totalCost)}</>}
-          </span>
+  // <details>/<summary> lets the reviewer collapse the table when they need
+  // more screen space. The <summary> line always shows the headline totals
+  // so the section stays useful in either state.
+  return (
+    <details
+      open
+      className="group bg-white border border-neutral-200 rounded-lg p-5 shadow-sm [&[open]>summary_.chev]:rotate-90"
+    >
+      <summary className="list-none cursor-pointer flex flex-wrap items-baseline gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
+        <span
+          className="chev text-neutral-400 text-xs transition-transform select-none"
+          aria-hidden="true"
+        >
+          ▶
+        </span>
+        <h2 className="text-lg font-semibold">Invoice overview</h2>
+        <span className="ml-auto text-sm font-medium text-neutral-800">
+          {minutesToHours(totalMinutes)} h
+          {totalCost != null && <> · {formatCzk(totalCost)}</>}
           {pendingMinutes > 0 && (
-            <>
-              <span className="text-neutral-300" aria-hidden="true">
-                ·
-              </span>
-              <span className="text-amber-700 font-medium">
-                {minutesToHours(pendingMinutes)} h pending
-              </span>
-            </>
+            <span className="ml-2 text-amber-700 font-normal">
+              · {minutesToHours(pendingMinutes)} h pending
+            </span>
           )}
           {rejectedMinutes > 0 && (
-            <>
-              <span className="text-neutral-300" aria-hidden="true">
-                ·
-              </span>
-              <span className="text-red-700 font-medium">
-                {minutesToHours(rejectedMinutes)} h rejected
-              </span>
-            </>
+            <span className="ml-2 text-red-700 font-normal">
+              · {minutesToHours(rejectedMinutes)} h rejected
+            </span>
           )}
-        </div>
-      </section>
-    );
-  }
-
-  return (
-    <section
-      ref={sectionRef}
-      className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-5 shadow-sm"
-    >
-      <h2 className="text-lg font-semibold mb-3">Invoice overview</h2>
-      <p className="text-sm text-neutral-600 mb-3">
+        </span>
+      </summary>
+      <p className="text-sm text-neutral-600 mt-3 mb-3">
         Hours per project for items you&apos;ve <strong>approved</strong>, with
         any multi-project assignments split evenly. Pending and rejected items
         are listed below and don&apos;t count toward the total until approved.
@@ -498,7 +441,7 @@ function InvoiceOverview({
         />
         <PmShareIndicator pmMinutes={pmMinutes} invoiceableMinutes={totalMinutes} />
       </div>
-    </section>
+    </details>
   );
 }
 
