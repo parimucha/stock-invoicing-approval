@@ -29,6 +29,7 @@ type Props = {
   items: BreakdownItem[];
   hourlyRateCzk: number | null;
   jiraBaseUrl: string | null;
+  defaultCollapsed?: boolean;
 };
 
 // Per-item card for buckets of work excluded from invoice totals (rejected
@@ -41,6 +42,7 @@ export function ItemBreakdownCard({
   items,
   hourlyRateCzk,
   jiraBaseUrl,
+  defaultCollapsed = false,
 }: Props) {
   if (items.length === 0) return null;
 
@@ -48,9 +50,20 @@ export function ItemBreakdownCard({
   const totalCost = minutesToCzk(totalMinutes, hourlyRateCzk);
   const styles = TONE_STYLES[tone];
 
+  // <details>/<summary> keeps this a server component — no client JS needed
+  // for the toggle. Chevron rotates via the [&[open]>summary] selector.
   return (
-    <section className={`bg-white border ${styles.border} rounded-lg p-5`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <details
+      open={!defaultCollapsed}
+      className={`group bg-white border ${styles.border} rounded-lg p-5 [&[open]>summary_.chev]:rotate-90`}
+    >
+      <summary className="list-none cursor-pointer flex flex-wrap items-baseline gap-x-3 gap-y-1 [&::-webkit-details-marker]:hidden">
+        <span
+          className="chev text-neutral-400 text-xs transition-transform select-none"
+          aria-hidden="true"
+        >
+          ▶
+        </span>
         <h2 className={`text-lg font-semibold ${styles.title}`}>{title}</h2>
         <span className="text-sm text-neutral-600">
           {items.length} {items.length === 1 ? "item" : "items"} ·{" "}
@@ -66,7 +79,7 @@ export function ItemBreakdownCard({
             </>
           )}
         </span>
-      </div>
+      </summary>
       {helperText && (
         <p className="mt-1 text-xs text-neutral-500">{helperText}</p>
       )}
@@ -109,6 +122,6 @@ export function ItemBreakdownCard({
           })}
         </tbody>
       </table>
-    </section>
+    </details>
   );
 }

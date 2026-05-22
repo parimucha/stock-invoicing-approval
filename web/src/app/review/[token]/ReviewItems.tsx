@@ -38,6 +38,16 @@ export function ReviewItems({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [source, setSource] = useState<SourceFilter>("all");
   const [query, setQuery] = useState("");
+  const [hideApproved, setHideApproved] = useState(false);
+  // Per-project-group user override for the collapsed/expanded `<details>`.
+  // Without this, React re-applies the JSX `open={...}` prop on every render
+  // (every autosave triggers one) and snaps the disclosure back to the
+  // auto-computed state, undoing manual clicks. Storing the user's choice
+  // keyed by group name lets the auto-collapse rule still apply to groups
+  // they haven't touched.
+  const [groupOpenOverride, setGroupOpenOverride] = useState<
+    Record<string, boolean>
+  >({});
 
   // Assignments are hoisted here so the invoice overview stays live without a
   // server round-trip on every autosave. ItemCard becomes a controlled input.
@@ -114,6 +124,7 @@ export function ReviewItems({
     const q = query.trim().toLowerCase();
     return items.filter((it) => {
       if (status !== "all" && it.approval !== status) return false;
+      if (hideApproved && it.approval === "approved") return false;
       if (source === "jira" && !it.jiraKey) return false;
       if (source === "pm" && it.jiraKey) return false;
       if (!q) return true;
@@ -129,7 +140,7 @@ export function ReviewItems({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, status, source, query]);
+  }, [items, status, source, query, hideApproved]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -190,6 +201,7 @@ export function ReviewItems({
         items={pendingItems}
         hourlyRateCzk={hourlyRateCzk}
         jiraBaseUrl={jiraBaseUrl}
+        defaultCollapsed
       />
 
       <ItemBreakdownCard
@@ -210,6 +222,8 @@ export function ReviewItems({
         setSource={setSource}
         query={query}
         setQuery={setQuery}
+        hideApproved={hideApproved}
+        setHideApproved={setHideApproved}
         resultCount={sorted.length}
         totalCount={items.length}
       />
@@ -218,14 +232,44 @@ export function ReviewItems({
         if (g.items.length === 0) return null;
         const groupMinutes = g.items.reduce((s, i) => s + i.workedMinutes, 0);
         const groupCost = minutesToCzk(groupMinutes, hourlyRateCzk);
+        // Collapse fully-approved groups on a second pass so the reviewer's
+        // attention lands on what still needs work. Stay expanded when the
+        // user is explicitly filtering for approved — collapsing then would
+        // hide exactly what they asked to see.
+        const allApproved = g.items.every((i) => i.approval === "approved");
+        const collapse = allApproved && status !== "approved";
+        const open = groupOpenOverride[g.name] ?? !collapse;
         return (
-          <section key={g.name} className="space-y-3">
-            <h2 className="text-sm font-semibold text-neutral-700 uppercase tracking-wide">
-              {g.name} · {minutesToHours(groupMinutes)} h ·{" "}
-              {groupCost != null && <>{formatCzk(groupCost)} · </>}
-              {g.items.length} {g.items.length === 1 ? "item" : "items"}
-            </h2>
-            <div className="space-y-3">
+          <details
+            key={g.name}
+            open={open}
+            onToggle={(e) =>
+              setGroupOpenOverride((prev) => ({
+                ...prev,
+                [g.name]: (e.currentTarget as HTMLDetailsElement).open,
+              }))
+            }
+            className="group space-y-3 [&[open]>summary_.chev]:rotate-90"
+          >
+            <summary className="list-none cursor-pointer flex items-center gap-2 text-sm font-semibold text-neutral-700 uppercase tracking-wide [&::-webkit-details-marker]:hidden">
+              <span
+                className="chev text-neutral-400 text-xs transition-transform select-none"
+                aria-hidden="true"
+              >
+                ▶
+              </span>
+              <span>
+                {g.name} · {minutesToHours(groupMinutes)} h ·{" "}
+                {groupCost != null && <>{formatCzk(groupCost)} · </>}
+                {g.items.length} {g.items.length === 1 ? "item" : "items"}
+                {collapse && (
+                  <span className="ml-2 normal-case tracking-normal text-green-700 font-medium">
+                    all approved ✓
+                  </span>
+                )}
+              </span>
+            </summary>
+            <div className="space-y-3 mt-3">
               {g.items.map((it) => (
                 <ItemCard
                   key={it.id}
@@ -240,7 +284,7 @@ export function ReviewItems({
                 />
               ))}
             </div>
-          </section>
+          </details>
         );
       })}
 
@@ -417,6 +461,8 @@ type FilterBarProps = {
   setSource: (v: SourceFilter) => void;
   query: string;
   setQuery: (v: string) => void;
+  hideApproved: boolean;
+  setHideApproved: (v: boolean) => void;
   resultCount: number;
   totalCount: number;
 };
@@ -430,6 +476,8 @@ function FilterBar({
   setSource,
   query,
   setQuery,
+  hideApproved,
+  setHideApproved,
   resultCount,
   totalCount,
 }: FilterBarProps) {
@@ -480,6 +528,18 @@ function FilterBar({
             ["pm", "PM"],
           ]}
         />
+        <button
+          type="button"
+          onClick={() => setHideApproved(!hideApproved)}
+          aria-pressed={hideApproved}
+          className={`px-2 py-1 rounded border transition-colors ${
+            hideApproved
+              ? "bg-neutral-900 text-white border-neutral-900"
+              : "bg-white text-neutral-700 border-neutral-200 hover:bg-neutral-50"
+          }`}
+        >
+          Hide approved
+        </button>
         <div className="ml-auto text-neutral-500">
           {resultCount === totalCount
             ? `${totalCount} ${totalCount === 1 ? "item" : "items"}`
@@ -510,11 +570,10 @@ function PillGroup<T extends string>({
             key={v}
             type="button"
             onClick={() => onChange(v)}
-            className={`px-2 py-1 transition-colors ${
-              value === v
+            className={`px-2 py-1 transition-colors ${value === v
                 ? "bg-neutral-900 text-white"
                 : "bg-white text-neutral-700 hover:bg-neutral-50"
-            }`}
+              }`}
           >
             {l}
           </button>
