@@ -243,12 +243,16 @@ export function ReviewItems({
           <details
             key={g.name}
             open={open}
-            onToggle={(e) =>
+            onToggle={(e) => {
+              // Read currentTarget.open NOW, not inside the updater — the
+              // browser nulls currentTarget once the event handler returns,
+              // and React may call the updater asynchronously by then.
+              const isOpen = (e.currentTarget as HTMLDetailsElement).open;
               setGroupOpenOverride((prev) => ({
                 ...prev,
-                [g.name]: (e.currentTarget as HTMLDetailsElement).open,
-              }))
-            }
+                [g.name]: isOpen,
+              }));
+            }}
             className="group space-y-3 [&[open]>summary_.chev]:rotate-90"
           >
             <summary className="list-none cursor-pointer flex items-center gap-2 text-sm font-semibold text-neutral-700 uppercase tracking-wide [&::-webkit-details-marker]:hidden">
