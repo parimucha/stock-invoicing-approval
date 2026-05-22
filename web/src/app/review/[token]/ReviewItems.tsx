@@ -26,6 +26,7 @@ type Props = {
 type SortKey = "worked-desc" | "worked-asc" | "over" | "under" | "key";
 type StatusFilter = "all" | "pending" | "approved" | "rejected";
 type SourceFilter = "all" | "jira" | "pm";
+type GroupBy = "project" | "status" | "source" | "flat";
 
 export function ReviewItems({
   items,
@@ -40,6 +41,24 @@ export function ReviewItems({
   const [source, setSource] = useState<SourceFilter>("all");
   const [query, setQuery] = useState("");
   const [hideApproved, setHideApproved] = useState(false);
+  // "all" → no filter, "unassigned" → items with no projects ticked,
+  // otherwise a project ID.
+  const [projectFilter, setProjectFilter] = useState<string>("all");
+  const [groupBy, setGroupBy] = useState<GroupBy>("project");
+
+  const hasActiveFilters =
+    query.trim() !== "" ||
+    status !== "all" ||
+    source !== "all" ||
+    projectFilter !== "all" ||
+    hideApproved;
+  const clearAllFilters = useCallback(() => {
+    setQuery("");
+    setStatus("all");
+    setSource("all");
+    setProjectFilter("all");
+    setHideApproved(false);
+  }, []);
   // Per-project-group user override for the collapsed/expanded `<details>`.
   // Without this, React re-applies the JSX `open={...}` prop on every render
   // (every autosave triggers one) and snaps the disclosure back to the
@@ -128,6 +147,14 @@ export function ReviewItems({
       if (hideApproved && it.approval === "approved") return false;
       if (source === "jira" && !it.jiraKey) return false;
       if (source === "pm" && it.jiraKey) return false;
+      if (projectFilter !== "all") {
+        const assigned = assignments[it.id] ?? [];
+        if (projectFilter === "unassigned") {
+          if (assigned.length !== 0) return false;
+        } else if (!assigned.includes(projectFilter)) {
+          return false;
+        }
+      }
       if (!q) return true;
       const labels = (it.jiraLabels as string[] | null) ?? [];
       const hay = [
@@ -141,7 +168,7 @@ export function ReviewItems({
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, status, source, query, hideApproved]);
+  }, [items, status, source, query, hideApproved, projectFilter, assignments]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -168,14 +195,78 @@ export function ReviewItems({
     return arr;
   }, [filtered, sort]);
 
-  // Grouping follows the reviewer's live project checkboxes (assignments),
-  // not the upload-time suggestedProjects. An item assigned to N projects
-  // appears in each of those groups, with its worked time split N ways
-  // (matching the invoice overview math). Within a group, the item shows as
-  // a full editable card in its "primary" location — the lowest-sortOrder
-  // assigned project — and as a compact read-only row elsewhere. This
-  // duplicates visibility without duplicating editable state.
-  const groups = useMemo(() => {
+  // Grouping. Project view follows the reviewer's live checkboxes
+  // (assignments). An item assigned to N projects appears in each of those
+  // groups, with its worked time split N ways (matching the invoice
+  // overview math). Full editable card lives in its "primary" location
+  // (lowest-sortOrder assigned project); compact read-only row elsewhere.
+  // Other modes (status / source / flat) don't duplicate — each item
+  // shows once as a full card.
+  const groups = useMemo<
+    Array<{
+      name: string | null;
+      items: Array<{
+        item: ItemWithAssignments;
+        minutes: number;
+        primary: boolean;
+      }>;
+    }>
+  >(() => {
+    if (groupBy === "flat") {
+      return [
+        {
+          name: null,
+          items: sorted.map((it) => ({
+            item: it,
+            minutes: it.workedMinutes,
+            primary: true,
+          })),
+        },
+      ];
+    }
+
+    if (groupBy === "status") {
+      const order = ["Pending", "Rejected", "Approved"] as const;
+      const map: Record<string, ItemWithAssignments[]> = {
+        Pending: [],
+        Rejected: [],
+        Approved: [],
+      };
+      for (const it of sorted) {
+        const bucket =
+          it.approval === "approved"
+            ? "Approved"
+            : it.approval === "rejected"
+              ? "Rejected"
+              : "Pending";
+        map[bucket].push(it);
+      }
+      return order.map((name) => ({
+        name,
+        items: map[name].map((it) => ({
+          item: it,
+          minutes: it.workedMinutes,
+          primary: true,
+        })),
+      }));
+    }
+
+    if (groupBy === "source") {
+      const map: Record<string, ItemWithAssignments[]> = { JIRA: [], PM: [] };
+      for (const it of sorted) {
+        map[it.jiraKey ? "JIRA" : "PM"].push(it);
+      }
+      return (["JIRA", "PM"] as const).map((name) => ({
+        name,
+        items: map[name].map((it) => ({
+          item: it,
+          minutes: it.workedMinutes,
+          primary: true,
+        })),
+      }));
+    }
+
+    // groupBy === "project"
     const order = [...projects.map((p) => p.name), "Unassigned"];
     const projectNameById = new Map(projects.map((p) => [p.id, p.name]));
     const map = new Map<
@@ -209,17 +300,30 @@ export function ReviewItems({
       }
       const share = it.workedMinutes / assigned.length;
       const primaryName = primaryProjectNameByItem.get(it.id);
+      const singleProjectFilter =
+        projectFilter !== "all" && projectFilter !== "unassigned";
       for (const pid of assigned) {
+        // When the reviewer filters to a single project, suppress the
+        // compact-row duplicates in other project groups — they'd just be
+        // noise outside the project they asked to see.
+        if (singleProjectFilter && pid !== projectFilter) continue;
         const projectName = projectNameById.get(pid) ?? "Unassigned";
+        // With a single-project filter the item only appears in one group,
+        // so it must render as the editable card — even if its "natural"
+        // primary (lowest-sortOrder assigned project) would have been
+        // somewhere else.
+        const primary = singleProjectFilter
+          ? true
+          : projectName === primaryName;
         map.get(projectName)?.push({
           item: it,
           minutes: share,
-          primary: projectName === primaryName,
+          primary,
         });
       }
     }
     return order.map((name) => ({ name, items: map.get(name) ?? [] }));
-  }, [sorted, projects, assignments]);
+  }, [sorted, projects, assignments, projectFilter, groupBy]);
 
   return (
     <div className="space-y-6">
@@ -262,12 +366,44 @@ export function ReviewItems({
         setQuery={setQuery}
         hideApproved={hideApproved}
         setHideApproved={setHideApproved}
+        projectFilter={projectFilter}
+        setProjectFilter={setProjectFilter}
+        groupBy={groupBy}
+        setGroupBy={setGroupBy}
+        projects={projects}
         resultCount={sorted.length}
         totalCount={items.length}
+        filteredMinutes={sorted.reduce((s, i) => s + i.workedMinutes, 0)}
+        hourlyRateCzk={hourlyRateCzk}
+        hasActiveFilters={hasActiveFilters}
+        clearAllFilters={clearAllFilters}
       />
 
       {groups.map((g) => {
         if (g.items.length === 0) return null;
+        // Flat mode: no header, no <details> wrapper — just the cards.
+        if (g.name === null) {
+          return (
+            <div key="__flat" className="space-y-3">
+              {g.items.map((gi) => (
+                <div key={gi.item.id} id={`item-${gi.item.id}`}>
+                  <ItemCard
+                    item={gi.item}
+                    token={token}
+                    projects={projects}
+                    locked={locked}
+                    jiraBaseUrl={jiraBaseUrl}
+                    assigned={assignments[gi.item.id] ?? []}
+                    onAssignedChange={(next) =>
+                      setItemAssignments(gi.item.id, next)
+                    }
+                    hourlyRateCzk={hourlyRateCzk}
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        }
         const groupMinutes = g.items.reduce((s, gi) => s + gi.minutes, 0);
         const groupCost = minutesToCzk(groupMinutes, hourlyRateCzk);
         const uniqueItemCount = g.items.length;
@@ -278,9 +414,10 @@ export function ReviewItems({
         const allApproved = g.items.every((gi) => gi.item.approval === "approved");
         const collapse = allApproved && status !== "approved";
         const open = groupOpenOverride[g.name] ?? !collapse;
+        const groupName = g.name;
         return (
           <details
-            key={g.name}
+            key={groupName}
             open={open}
             onToggle={(e) => {
               // Read currentTarget.open NOW, not inside the updater — the
@@ -289,7 +426,7 @@ export function ReviewItems({
               const isOpen = (e.currentTarget as HTMLDetailsElement).open;
               setGroupOpenOverride((prev) => ({
                 ...prev,
-                [g.name]: isOpen,
+                [groupName]: isOpen,
               }));
             }}
             className="group space-y-3 [&[open]>summary_.chev]:rotate-90"
@@ -462,8 +599,17 @@ type FilterBarProps = {
   setQuery: (v: string) => void;
   hideApproved: boolean;
   setHideApproved: (v: boolean) => void;
+  projectFilter: string;
+  setProjectFilter: (v: string) => void;
+  groupBy: GroupBy;
+  setGroupBy: (v: GroupBy) => void;
+  projects: Project[];
   resultCount: number;
   totalCount: number;
+  filteredMinutes: number;
+  hourlyRateCzk: number | null;
+  hasActiveFilters: boolean;
+  clearAllFilters: () => void;
 };
 
 function FilterBar({
@@ -477,11 +623,27 @@ function FilterBar({
   setQuery,
   hideApproved,
   setHideApproved,
+  projectFilter,
+  setProjectFilter,
+  groupBy,
+  setGroupBy,
+  projects,
   resultCount,
   totalCount,
+  filteredMinutes,
+  hourlyRateCzk,
+  hasActiveFilters,
+  clearAllFilters,
 }: FilterBarProps) {
+  const filteredCost = minutesToCzk(filteredMinutes, hourlyRateCzk);
+  const projectName =
+    projectFilter === "all"
+      ? null
+      : projectFilter === "unassigned"
+        ? "Unassigned"
+        : (projects.find((p) => p.id === projectFilter)?.name ?? projectFilter);
   return (
-    <div className="bg-white border border-neutral-200 rounded-lg p-3 space-y-2">
+    <div className="sticky top-2 z-10 bg-white/95 backdrop-blur border border-neutral-200 rounded-lg p-3 space-y-2 shadow-sm">
       <div className="flex flex-wrap gap-3 items-center">
         <input
           type="search"
@@ -490,6 +652,35 @@ function FilterBar({
           onChange={(e) => setQuery(e.target.value)}
           className="flex-1 min-w-[200px] text-sm border border-neutral-300 rounded px-2 py-1"
         />
+        <label className="text-xs text-neutral-600 flex items-center gap-1">
+          Project
+          <select
+            value={projectFilter}
+            onChange={(e) => setProjectFilter(e.target.value)}
+            className="border border-neutral-300 rounded px-1.5 py-1 text-sm text-neutral-800"
+          >
+            <option value="all">All projects</option>
+            <option value="unassigned">Unassigned</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-neutral-600 flex items-center gap-1">
+          Group by
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+            className="border border-neutral-300 rounded px-1.5 py-1 text-sm text-neutral-800"
+          >
+            <option value="project">Project</option>
+            <option value="status">Status</option>
+            <option value="source">Source (JIRA / PM)</option>
+            <option value="flat">Flat — no groups</option>
+          </select>
+        </label>
         <label className="text-xs text-neutral-600 flex items-center gap-1">
           Sort
           <select
@@ -539,14 +730,75 @@ function FilterBar({
         >
           Hide approved
         </button>
-        <div className="ml-auto text-neutral-500">
+        <div className="ml-auto text-neutral-500 whitespace-nowrap">
           {resultCount === totalCount
             ? `${totalCount} ${totalCount === 1 ? "item" : "items"}`
-            : `${resultCount} of ${totalCount} items`}
+            : `${resultCount} of ${totalCount} items`}{" "}
+          · {minutesToHours(filteredMinutes)} h
+          {filteredCost != null && <> · {formatCzk(filteredCost)}</>}
         </div>
       </div>
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-neutral-100 text-xs">
+          <span className="text-neutral-500">Active:</span>
+          {query.trim() !== "" && (
+            <FilterChip label={`Search "${query.trim()}"`} onClear={() => setQuery("")} />
+          )}
+          {status !== "all" && (
+            <FilterChip
+              label={`Status: ${capitalize(status)}`}
+              onClear={() => setStatus("all")}
+            />
+          )}
+          {source !== "all" && (
+            <FilterChip
+              label={`Source: ${source === "jira" ? "JIRA" : "PM"}`}
+              onClear={() => setSource("all")}
+            />
+          )}
+          {projectFilter !== "all" && projectName && (
+            <FilterChip
+              label={`Project: ${projectName}`}
+              onClear={() => setProjectFilter("all")}
+            />
+          )}
+          {hideApproved && (
+            <FilterChip
+              label="Hiding approved"
+              onClear={() => setHideApproved(false)}
+            />
+          )}
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="ml-1 text-neutral-600 hover:text-neutral-900 hover:underline"
+          >
+            Clear all
+          </button>
+        </div>
+      )}
     </div>
   );
+}
+
+function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+  return (
+    <span className="inline-flex items-center gap-1 bg-neutral-100 text-neutral-700 rounded px-1.5 py-0.5">
+      {label}
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-neutral-400 hover:text-neutral-900"
+        aria-label={`Remove ${label} filter`}
+      >
+        ×
+      </button>
+    </span>
+  );
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 const APPROVAL_DOT: Record<string, { bg: string; label: string }> = {

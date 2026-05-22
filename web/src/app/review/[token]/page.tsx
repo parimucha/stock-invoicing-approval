@@ -251,15 +251,19 @@ function ReviewHelpContent() {
       </section>
 
       <section>
-        <h3 className="font-semibold mb-1">Filter and sort</h3>
+        <h3 className="font-semibold mb-1">Filter, sort and group</h3>
         <p>
-          Above the items: search by key / summary / label, filter by approval
-          status or source (JIRA / PM), and sort by worked hours, over- or
-          under-budget, or JIRA key. The{" "}
-          <strong>Hide approved</strong> toggle is handy on a second pass to
-          focus on what still needs your attention. Project groups whose
-          items are all approved auto-collapse for the same reason — click
-          the header to expand any group.
+          The toolbar sticks to the top as you scroll. Search by key /
+          summary / label, filter by approval status, source (JIRA / PM), or
+          a specific project, and sort by worked hours, over- or
+          under-budget, or JIRA key. <strong>Group by</strong> switches the
+          layout between Project (default), Status, Source, or Flat.{" "}
+          <strong>Hide approved</strong> focuses the view on what still
+          needs attention; project groups whose items are all approved
+          auto-collapse for the same reason. When any filter is active, an{" "}
+          <em>Active</em> row shows the running filters and a{" "}
+          <strong>Clear all</strong> button. Result count includes the
+          total hours and cost of the filtered slice.
         </p>
       </section>
 
