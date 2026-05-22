@@ -106,6 +106,21 @@ export async function signOff(formData: FormData) {
   const report = await loadReport(token);
   if (isLocked(report.status)) throw new Error("Report is already signed off.");
 
+  // Approving a report while items are still pending would silently exclude
+  // them from the invoice — pending items don't bill. Force the reviewer to
+  // approve or reject each item first. The UI also disables the button, but
+  // the server is the authoritative gate.
+  if (decision === "approved") {
+    const pendingCount = await prisma.reportItem.count({
+      where: { reportId: report.id, internal: false, approval: "pending" },
+    });
+    if (pendingCount > 0) {
+      throw new Error(
+        `Resolve all ${pendingCount} pending item${pendingCount === 1 ? "" : "s"} before approving the report.`,
+      );
+    }
+  }
+
   await prisma.report.update({
     where: { id: report.id },
     data: { status: decision, reviewedAt: new Date() },

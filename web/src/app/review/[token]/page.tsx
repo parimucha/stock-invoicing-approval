@@ -37,6 +37,10 @@ export default async function ReviewPage({
 
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
   const locked = report.status === "approved" || report.status === "rejected";
+  const pendingCount = report.items.reduce(
+    (n, i) => (i.approval === "pending" ? n + 1 : n),
+    0,
+  );
   const totalMinutes = report.items.reduce((s, i) => s + i.workedMinutes, 0);
   const totalCost = minutesToCzk(totalMinutes, report.hourlyRateCzk);
   const jiraBaseUrl = getJiraBaseUrl();
@@ -124,30 +128,50 @@ export default async function ReviewPage({
               </form>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-3">
-              <form action={signOff}>
-                <input type="hidden" name="token" value={token} />
-                <input type="hidden" name="decision" value="approved" />
-                <PendingButton
-                  className="bg-green-600 text-white rounded px-4 py-2 text-sm hover:bg-green-700"
-                  pendingLabel="Approving…"
+            <div className="space-y-3">
+              {pendingCount > 0 && (
+                <p
+                  role="alert"
+                  className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2"
                 >
-                  Approve report
-                </PendingButton>
-              </form>
-              <form action={signOff}>
-                <input type="hidden" name="token" value={token} />
-                <input type="hidden" name="decision" value="rejected" />
-                <PendingButton
-                  className="bg-red-600 text-white rounded px-4 py-2 text-sm hover:bg-red-700"
-                  pendingLabel="Rejecting…"
-                >
-                  Reject report
-                </PendingButton>
-              </form>
-              <p className="text-xs text-neutral-500 self-center">
-                After sign-off the report is locked.
-              </p>
+                  <strong>
+                    {pendingCount} item{pendingCount === 1 ? "" : "s"} still pending.
+                  </strong>{" "}
+                  Approve or reject each one before approving the report —
+                  pending items don&apos;t get billed.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-3">
+                <form action={signOff}>
+                  <input type="hidden" name="token" value={token} />
+                  <input type="hidden" name="decision" value="approved" />
+                  <PendingButton
+                    disabled={pendingCount > 0}
+                    className="bg-green-600 text-white rounded px-4 py-2 text-sm hover:bg-green-700 disabled:bg-neutral-300 disabled:hover:bg-neutral-300 disabled:cursor-not-allowed"
+                    pendingLabel="Approving…"
+                    title={
+                      pendingCount > 0
+                        ? `Resolve ${pendingCount} pending item${pendingCount === 1 ? "" : "s"} first`
+                        : undefined
+                    }
+                  >
+                    Approve report
+                  </PendingButton>
+                </form>
+                <form action={signOff}>
+                  <input type="hidden" name="token" value={token} />
+                  <input type="hidden" name="decision" value="rejected" />
+                  <PendingButton
+                    className="bg-red-600 text-white rounded px-4 py-2 text-sm hover:bg-red-700"
+                    pendingLabel="Rejecting…"
+                  >
+                    Reject report
+                  </PendingButton>
+                </form>
+                <p className="text-xs text-neutral-500 self-center">
+                  After sign-off the report is locked.
+                </p>
+              </div>
             </div>
           )}
         </section>
