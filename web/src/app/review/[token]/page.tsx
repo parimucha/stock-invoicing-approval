@@ -239,6 +239,8 @@ function ReviewHelpContent() {
             bill to. Multiple ticks split the hours evenly, and the item then
             also appears as a read-only row in each shared project group
             below (click <em>edit ↑</em> to jump back to the editable card).
+            Once you approve an item the checkboxes lock; switch the item
+            back to Pending if you need to change the billing split.
           </li>
           <li>
             <strong>Approve / Reject / Pending</strong> — your decision per

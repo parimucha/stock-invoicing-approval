@@ -114,14 +114,6 @@ export function ItemCard({
     else next.delete(id);
     const nextArr = [...next].sort();
     onAssignedChange(nextArr);
-    // An approved item with zero projects has nowhere to bill — would land
-    // in the Unassigned bucket. Auto-revert to pending so the state stays
-    // consistent and the server-side gate in saveItem doesn't reject the
-    // autosave. Matches what the disabled "Approved" radio enforces going
-    // the other direction.
-    if (nextArr.length === 0 && approval === "approved") {
-      setApproval("pending");
-    }
     schedule();
   }
 
@@ -226,19 +218,37 @@ export function ItemCard({
 
       <div className="grid md:grid-cols-2 gap-4 pt-2 border-t border-neutral-200/60">
         <div>
-          <div className="text-xs font-medium text-neutral-600 mb-1">Projects</div>
+          <div className="text-xs font-medium text-neutral-600 mb-1 flex items-center gap-2">
+            <span>Projects</span>
+            {approval === "approved" && !locked && (
+              <span className="text-[10px] uppercase tracking-wider text-green-700 bg-green-100 rounded px-1 py-0.5 font-medium">
+                Locked while approved
+              </span>
+            )}
+          </div>
           <div className="space-y-1">
-            {projects.map((p) => (
-              <label key={p.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={assigned.includes(p.id)}
-                  onChange={(e) => toggleProject(p.id, e.target.checked)}
-                  disabled={locked}
-                />
-                {p.name}
-              </label>
-            ))}
+            {projects.map((p) => {
+              const lockedByApproval = approval === "approved";
+              return (
+                <label
+                  key={p.id}
+                  className={`flex items-center gap-2 text-sm ${lockedByApproval ? "text-neutral-500" : ""}`}
+                  title={
+                    lockedByApproval
+                      ? "Switch this item to Pending to change project assignment."
+                      : undefined
+                  }
+                >
+                  <input
+                    type="checkbox"
+                    checked={assigned.includes(p.id)}
+                    onChange={(e) => toggleProject(p.id, e.target.checked)}
+                    disabled={locked || lockedByApproval}
+                  />
+                  {p.name}
+                </label>
+              );
+            })}
           </div>
         </div>
 
