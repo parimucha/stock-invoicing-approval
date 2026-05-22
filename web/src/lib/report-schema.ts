@@ -43,9 +43,6 @@ export function parseUploadReport(input: unknown): UploadReport {
   const productive_deal_id = str("productive_deal_id", true);
   const productive_budget_name = str("productive_budget_name", true);
 
-  if (!/^\d{4}-\d{2}$/.test(label)) {
-    throw new Error("label must be YYYY-MM (e.g. 2026-03).");
-  }
   for (const [k, v] of [
     ["period_start", period_start],
     ["period_end", period_end],
