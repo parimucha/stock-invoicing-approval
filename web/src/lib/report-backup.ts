@@ -122,6 +122,10 @@ export interface Backup {
   projects: BackupProject[];
 }
 
+// periodStart/periodEnd come from Prisma `@db.Date` columns, which Prisma
+// returns as a Date at UTC midnight. Taking the UTC ISO date therefore yields
+// the correct calendar date, and restore parses it back with
+// `new Date("YYYY-MM-DD")` (also UTC midnight), so the round-trip is stable.
 function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -209,6 +213,7 @@ export function parseBackup(input: unknown): ParsedBackup {
   }
   const rep = rRaw as Record<string, unknown>;
 
+  // Only use for required, non-empty string fields (rejects "").
   const reqStr = (k: string): string => {
     const v = rep[k];
     if (typeof v !== "string" || v === "") throw new Error(`Missing field: report.${k}`);
@@ -248,6 +253,7 @@ export function parseBackup(input: unknown): ParsedBackup {
     ["periodEnd", periodEnd],
   ] as const) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) throw new Error(`report.${k} must be YYYY-MM-DD.`);
+    if (Number.isNaN(Date.parse(v))) throw new Error(`report.${k} is not a valid date.`);
   }
   const status = reqStr("status");
   if (!REPORT_STATUSES.includes(status as ReportStatus)) {
@@ -285,14 +291,23 @@ export function parseBackup(input: unknown): ParsedBackup {
     if (!Array.isArray(it.assignedProjects)) {
       throw new Error(`Item ${i} assignedProjects must be an array.`);
     }
+    // Reject present-but-non-numeric values rather than silently nulling them —
+    // a coerced null would drop real worked/estimated time on restore.
+    const optItemInt = (k: string): number | null => {
+      const v = it[k];
+      if (v === undefined || v === null) return null;
+      if (typeof v !== "number" || !Number.isFinite(v)) {
+        throw new Error(`Item ${i} ${k} must be a number or null.`);
+      }
+      return v;
+    };
     return {
       source: it.source,
       jiraKey: typeof it.jiraKey === "string" ? it.jiraKey : null,
       summary: it.summary,
       workedMinutes: it.workedMinutes,
-      totalWorkedMinutes:
-        typeof it.totalWorkedMinutes === "number" ? it.totalWorkedMinutes : null,
-      estimatedSeconds: typeof it.estimatedSeconds === "number" ? it.estimatedSeconds : null,
+      totalWorkedMinutes: optItemInt("totalWorkedMinutes"),
+      estimatedSeconds: optItemInt("estimatedSeconds"),
       jiraIssuetype: typeof it.jiraIssuetype === "string" ? it.jiraIssuetype : null,
       jiraStatus: typeof it.jiraStatus === "string" ? it.jiraStatus : null,
       jiraLabels: it.jiraLabels.filter((x): x is string => typeof x === "string"),

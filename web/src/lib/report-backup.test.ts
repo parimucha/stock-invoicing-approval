@@ -112,4 +112,50 @@ describe("parseBackup", () => {
     const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
     expect(() => parseBackup({ ...backup, projects: "nope" })).toThrow(/projects must be an array/);
   });
+
+  it("rejects a negative workedMinutes", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    const items = [{ ...backup.report.items[0], workedMinutes: -5 }];
+    const bad = { ...backup, report: { ...backup.report, items } };
+    expect(() => parseBackup(bad)).toThrow(/workedMinutes/);
+  });
+
+  it("rejects a present-but-non-numeric totalWorkedMinutes", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    const items = [{ ...backup.report.items[0], totalWorkedMinutes: "120" }];
+    const bad = { ...backup, report: { ...backup.report, items } };
+    expect(() => parseBackup(bad)).toThrow(/totalWorkedMinutes/);
+  });
+
+  it("round-trips an item with all nullable fields null", () => {
+    const input = sampleInput();
+    input.report.reviewerNote = null;
+    input.report.sentAt = null;
+    input.report.reviewedAt = null;
+    input.report.productiveDealId = null;
+    input.report.productiveBudgetName = null;
+    input.report.hourlyRateCzk = null;
+    input.report.items[0] = {
+      source: "project_management",
+      jiraKey: null,
+      summary: "PM item",
+      workedMinutes: 0,
+      totalWorkedMinutes: null,
+      estimatedSeconds: null,
+      jiraIssuetype: null,
+      jiraStatus: null,
+      jiraLabels: [],
+      parentKey: null,
+      parentSummary: null,
+      pmNotes: null,
+      portaNotes: null,
+      internal: true,
+      suggestedProjects: [],
+      approval: "pending",
+      reviewerComment: null,
+      assignments: [],
+    };
+    const backup = serializeBackup(input, "2026-06-03T12:00:00.000Z");
+    expect(parseBackup(backup)).toEqual(backup);
+  });
 });
