@@ -176,6 +176,12 @@ export default async function ReportDetailPage({
               </PendingButton>
             </form>
           )}
+          <a
+            href={`/admin/reports/${reportId}/backup`}
+            className="bg-white border border-neutral-300 text-neutral-800 rounded px-3 py-1.5 text-sm hover:bg-neutral-50"
+          >
+            Download backup
+          </a>
           <ConfirmForm
             action={resetReport}
             confirmMessage="Reset all review state on this report? Status, approvals, reviewer comments, overall note, and project assignments will revert to the ingest-time defaults. Admin edits (summary renames, merges, PORTA notes) are kept."
