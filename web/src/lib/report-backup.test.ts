@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { serializeBackup, CURRENT_SCHEMA_VERSION, type SerializeInput } from "./report-backup";
+import { serializeBackup, parseBackup, CURRENT_SCHEMA_VERSION, type SerializeInput } from "./report-backup";
 
 function sampleInput(): SerializeInput {
   return {
@@ -75,5 +75,41 @@ describe("serializeBackup", () => {
       { id: "czech_pimcore", name: "Czech Pimcore", sortOrder: 1 },
       { id: "sap_spirit", name: "SAP Spirit - general", sortOrder: 5 },
     ]);
+  });
+});
+
+describe("parseBackup", () => {
+  it("round-trips a serialized backup unchanged", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    expect(parseBackup(backup)).toEqual(backup);
+  });
+
+  it("rejects an unsupported schemaVersion", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    expect(() => parseBackup({ ...backup, schemaVersion: 99 })).toThrow(/schemaVersion/);
+  });
+
+  it("rejects a missing report object", () => {
+    expect(() => parseBackup({ schemaVersion: 1, exportedAt: "x", projects: [] })).toThrow(
+      /report/,
+    );
+  });
+
+  it("rejects a bad period format", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    const bad = { ...backup, report: { ...backup.report, periodStart: "May 2026" } };
+    expect(() => parseBackup(bad)).toThrow(/periodStart must be YYYY-MM-DD/);
+  });
+
+  it("rejects an invalid item approval value", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    const items = [{ ...backup.report.items[0], approval: "maybe" }];
+    const bad = { ...backup, report: { ...backup.report, items } };
+    expect(() => parseBackup(bad)).toThrow(/approval/);
+  });
+
+  it("rejects when projects is not an array", () => {
+    const backup = serializeBackup(sampleInput(), "2026-06-03T12:00:00.000Z");
+    expect(() => parseBackup({ ...backup, projects: "nope" })).toThrow(/projects must be an array/);
   });
 });
