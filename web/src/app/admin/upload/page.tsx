@@ -176,12 +176,20 @@ async function restoreBackup(formData: FormData) {
     // already past it. The create-new branch below never sets an explicit id.
     // Keep it that way — inserting an id ahead of the sequence would risk a
     // future collision.
-    await prisma.$transaction(async (tx) => {
-      await tx.report.delete({ where: { id: target.id } });
-      await tx.report.create({
+    //
+    // Use the sequential array form, NOT an interactive `$transaction(async
+    // (tx) => …)`. The interactive form holds a connection open across awaits
+    // and carries a 5s default timeout; recreating a 50-item report (with
+    // nested assignments) over a remote connection exceeds that and 500s. The
+    // array form runs the same two operations atomically as one engine-side
+    // batch — the create is a single nested write, exactly like the ingestion
+    // upload that's proven to handle 50-item reports — and has no such timeout.
+    await prisma.$transaction([
+      prisma.report.delete({ where: { id: target.id } }),
+      prisma.report.create({
         data: buildCreateData(backup, target.id, backup.report.magicToken),
-      });
-    });
+      }),
+    ]);
     resultId = target.id;
   } else {
     // Create new. Label is free (no id/label match). Preserve the token unless
