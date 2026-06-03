@@ -7,3 +7,6 @@ node_modules/
 
 # Local ingestion output — contains employee time entries and internal JIRA metadata.
 data/
+
+# Vercel CLI link dir — contains .env.production (secrets). Never commit.
+.vercel/

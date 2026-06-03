@@ -17,7 +17,9 @@ Runs **locally**, once per month, using this repo plus Claude Code + Atlassian M
 ## Inputs you need each month
 
 - **Productive deal ID** for the stock.cz monthly budget — e.g. `3624023` for `stock.cz_design&development (2026/03)`. Find it in Productive (Budgets → open the month → URL or deal picker).
-- **Period** — `YYYY-MM-01` through the last day of the month.
+- **Period** — `YYYY-MM-01` through the last day of the month. Used only for the
+  report's display window in step 5; the step-1 entry pull uses a wide date
+  window instead (see step 1).
 - **Budget name** — purely for audit on the report (`stock.cz_design&development (2026/MM)`).
 
 ## Steps
@@ -26,8 +28,18 @@ Runs **locally**, once per month, using this repo plus Claude Code + Atlassian M
 
 ```bash
 mkdir -p data/<YYYY-MM>/raw
-node scripts/pull-productive-entries.js <dealId> <YYYY-MM-01> <YYYY-MM-LL> data/<YYYY-MM>/raw/productive-entries.json
+node scripts/pull-productive-entries.js <dealId> 2025-01-01 2026-12-31 data/<YYYY-MM>/raw/productive-entries.json
 ```
+
+**Use a wide date window, not the invoice month.** The `<after>`/`<before>`
+arguments filter by each entry's own *date*, not by the deal. Time entries are
+routinely moved between monthly budgets in Productive and keep their original
+date — so an entry sitting on May's deal can be dated in March. Bounding the
+pull to `YYYY-MM-01`…`YYYY-MM-LL` silently drops those moved entries and the
+report under-counts. A wide window (e.g. `2025-01-01`…`2026-12-31`) captures
+every entry on the deal regardless of date; the deal id is what scopes it to
+this month's budget. The report's *display* period stays the invoice month —
+that's set separately in step 5, independent of this pull.
 
 This paginates through every time entry on the deal in that window, flattens
 relationships, and resolves each entry's JIRA key from the native
@@ -35,8 +47,11 @@ relationships, and resolves each entry's JIRA key from the native
 carries a `jira_key_source` tag (`productive_field` / `note_regex`) so the
 recovery path is auditable.
 
-Sanity check: the script prints `Wrote N entries` — eyeball against expected
-volume. For March 2026 it was 169.
+Sanity check: the script prints `Wrote N entries`. Confirm the **summed worked
+time matches the deal's total in Productive** (Budgets → open the month) — this
+is the reliable reconciliation, not the entry count. If they differ, an entry
+is dated outside your window (widen it) or was added/removed in Productive
+since the last pull. For May 2026 it was 130 entries / 95:53.
 
 ### 2. Collect the distinct JIRA keys
 
