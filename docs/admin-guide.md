@@ -184,6 +184,41 @@ Right under the magic link:
   renamed summaries, merges, internal flags) are **kept**. Primarily a
   testing tool. Confirmation prompt.
 
+## Backup & restore
+
+A report can be exported as a single self-contained JSON file and re-imported
+later — to move it between environments, keep an off-system copy, or roll back
+to a known-good state. Unlike the ingestion upload (which only carries
+source data and resets review state), a backup captures **everything**: status,
+the client magic link, item approvals, reviewer comments, PORTA notes, the
+overall reviewer note, and project assignments.
+
+- **Download backup** — button in the report's status-action row at
+  `/admin/reports/<id>`. Available in any status. Downloads
+  `backup-<label>-<date>.json` containing the full report, all items, and the
+  definitions of every project they reference.
+- **Restore from backup** — the second form on `/admin/upload` ("Restore from
+  backup"). Paste or attach a backup file. On restore:
+  - Any projects the backup references are created if missing (existing
+    projects are left untouched).
+  - If a report with the same embedded id — or, failing that, the same `label`
+    (month) — already exists, it is **restored in place**: the existing report
+    is replaced, **reusing the same id and the same magic link** so links you've
+    already shared keep working.
+  - Otherwise a **new** report is created. The backup's magic link is kept
+    unless another report already uses it, in which case a fresh one is minted.
+- **Overwrite confirmation** — restoring over a report that is currently
+  `under_review` or `approved` overwrites the client's live approvals and
+  comments. That requires ticking the confirmation checkbox on the form; without
+  it, the restore is refused. (This differs from the ingestion upload, which
+  simply blocks replacing in-review/approved reports.)
+- **Conflicts** — if restoring would collide with a *different* report's unique
+  `label` or magic token, the restore is refused with a message rather than
+  guessing. Resolve by renaming or removing the other report first.
+
+Errors (bad JSON, a failed validation, a conflict, or a missing confirmation)
+surface the same way the ingestion upload's errors do.
+
 ## Filters and sort
 
 Above the items table. Same controls as the review view: search, status
