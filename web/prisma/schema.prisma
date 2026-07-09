@@ -45,6 +45,14 @@ model Client {
   createdAt  DateTime @default(now())
 }
 
+model ExportPreset {
+  id        String   @id @default(cuid())
+  name      String
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Report {
   id                   Int          @id @default(autoincrement())
   label                String       @unique
