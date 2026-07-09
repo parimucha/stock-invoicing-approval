@@ -19,6 +19,9 @@ export async function GET(
     },
   });
   if (!report) return new Response("Not found", { status: 404 });
+  if (report.status !== "approved") {
+    return new Response("Not found", { status: 404 });
+  }
 
   const model = computeExportModel(
     {
