@@ -310,14 +310,22 @@ import {
 } from "recharts";
 import { UNASSIGNED_ID, type AnalyticsMatrix } from "@/lib/analytics";
 
-// Stable categorical palette. (During execution, load the `dataviz` skill and
-// reconcile these hexes with its categorical palette — the structure is
-// unchanged, only the values may be swapped.)
+// Validated categorical palette from the `dataviz` skill — light-mode slots
+// 1–8 in fixed order (the ordering IS the CVD-safety mechanism; do not
+// reorder). Passes CVD (worst adjacent ΔE 24.2); the aqua/yellow/magenta
+// sub-3:1 contrast WARN is relieved by the always-present Projects panel
+// (labeled swatch + name + total) plus the legend and tooltips.
 const PALETTE = [
-  "#2563eb", "#16a34a", "#f59e0b", "#db2777", "#7c3aed",
-  "#0891b2", "#dc2626", "#65a30d", "#c026d3", "#ea580c",
+  "#2a78d6", // 1 blue
+  "#1baf7a", // 2 aqua
+  "#eda100", // 3 yellow
+  "#008300", // 4 green
+  "#4a3aa7", // 5 violet
+  "#e34948", // 6 red
+  "#e87ba4", // 7 magenta
+  "#eb6834", // 8 orange
 ];
-const UNASSIGNED_COLOR = "#9ca3af"; // neutral-400
+const UNASSIGNED_COLOR = "#9ca3af"; // neutral gray — reads as "not a project"
 
 function toHours(min: number): number {
   return Math.round((min / 60) * 10) / 10;
@@ -425,6 +433,9 @@ export default function AnalyticsDashboard({ matrix }: { matrix: AnalyticsMatrix
                     name={p.name}
                     stackId="h"
                     fill={colorByProject.get(p.id)}
+                    stroke="#ffffff"
+                    strokeWidth={1}
+                    radius={i === shownProjects.length - 1 ? [3, 3, 0, 0] : 0}
                     isAnimationActive={false}
                   />
                 ))}
