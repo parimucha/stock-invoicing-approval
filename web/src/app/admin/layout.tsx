@@ -26,6 +26,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link href="/admin/upload" className="hover:text-neutral-900">
                 Upload
               </Link>
+              <Link href="/admin/analytics" className="hover:text-neutral-900">
+                Analytics
+              </Link>
             </nav>
           </div>
           <form action={logout}>
