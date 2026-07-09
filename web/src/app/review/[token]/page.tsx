@@ -114,6 +114,14 @@ export default async function ReviewPage({
                 You have {report.status} this report on{" "}
                 {report.reviewedAt?.toLocaleString() ?? "—"}.
               </p>
+              {report.status === "approved" && (
+                <a
+                  href={`/review/${token}/export`}
+                  className="inline-block bg-neutral-900 text-white rounded px-4 py-2 text-sm hover:bg-neutral-800"
+                >
+                  Export to Excel
+                </a>
+              )}
               <form action={reopenReview}>
                 <input type="hidden" name="token" value={token} />
                 <PendingButton
