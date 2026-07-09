@@ -36,6 +36,9 @@ export default async function ReviewPage({
   }
 
   const projects = await prisma.project.findMany({ orderBy: { sortOrder: "asc" } });
+  const exportPresets = await prisma.exportPreset.findMany({
+    orderBy: { name: "asc" },
+  });
   const locked = report.status === "approved" || report.status === "rejected";
   const pendingCount = report.items.reduce(
     (n, i) => (i.approval === "pending" ? n + 1 : n),
@@ -68,7 +71,7 @@ export default async function ReviewPage({
           </div>
           {locked && (
             <p className="mt-3 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-              This report has been {report.status}. It's now read-only.
+              This report has been {report.status}. It&apos;s now read-only.
             </p>
           )}
         </div>
@@ -115,12 +118,34 @@ export default async function ReviewPage({
                 {report.reviewedAt?.toLocaleString() ?? "—"}.
               </p>
               {report.status === "approved" && (
-                <a
-                  href={`/review/${token}/export`}
-                  className="inline-block bg-neutral-900 text-white rounded px-4 py-2 text-sm hover:bg-neutral-800"
-                >
-                  Export to Excel
-                </a>
+                <div className="space-y-2">
+                  <form
+                    method="get"
+                    action={`/review/${token}/export`}
+                    className="flex flex-wrap items-center gap-2"
+                  >
+                    <select
+                      name="preset"
+                      className="border border-neutral-300 rounded px-2 py-1 text-sm"
+                    >
+                      <option value="">Default (FR/GER)</option>
+                      {exportPresets.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="bg-neutral-900 text-white rounded px-4 py-2 text-sm hover:bg-neutral-800">
+                      Export to Excel
+                    </button>
+                  </form>
+                  <a
+                    href={`/review/${token}/export-presets`}
+                    className="inline-block text-sm text-neutral-500 hover:underline"
+                  >
+                    Manage export presets →
+                  </a>
+                </div>
               )}
               <form action={reopenReview}>
                 <input type="hidden" name="token" value={token} />

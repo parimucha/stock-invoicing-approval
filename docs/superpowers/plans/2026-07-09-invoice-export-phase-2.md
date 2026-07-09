@@ -1035,6 +1035,10 @@ export async function GET(
     },
   });
   if (!report) return new Response("Not found", { status: 404 });
+  // Preserve the Phase 1 review fix: the endpoint only serves approved reports.
+  if (report.status !== "approved") {
+    return new Response("Not found", { status: 404 });
+  }
 
   let preset: ExportPresetConfig = DEFAULT_PRESET;
   if (presetId) {
