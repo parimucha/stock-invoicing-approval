@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeExportModel,
+  toExportInput,
   DEFAULT_PRESET,
   type ExportInput,
   type ExportItem,
@@ -153,5 +154,36 @@ describe("computeExportModel", () => {
     );
     expect(model.overview.groups[0].czk).toBeNull();
     expect(model.overview.totalCzk).toBeNull();
+  });
+});
+
+describe("toExportInput", () => {
+  it("maps a loaded report row into ExportInput with flattened assignedProjectIds", () => {
+    const input = toExportInput(
+      {
+        label: "2026-05",
+        periodStart: new Date("2026-05-01T00:00:00.000Z"),
+        hourlyRateCzk: 1500,
+        items: [
+          {
+            jiraKey: "PCM2-1",
+            summary: "s",
+            workedMinutes: 60,
+            estimatedSeconds: null,
+            jiraStatus: "Done",
+            parentKey: null,
+            parentSummary: null,
+            portaNotes: null,
+            reviewerComment: null,
+            approval: "approved",
+            assignments: [{ projectId: "french_pimcore" }, { projectId: "sap_spirit_fr" }],
+          },
+        ],
+      },
+      "https://x.atlassian.net",
+    );
+    expect(input.report.hourlyRateCzk).toBe(1500);
+    expect(input.jiraBaseUrl).toBe("https://x.atlassian.net");
+    expect(input.items[0].assignedProjectIds).toEqual(["french_pimcore", "sap_spirit_fr"]);
   });
 });

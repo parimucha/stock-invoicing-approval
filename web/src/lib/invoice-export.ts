@@ -199,3 +199,54 @@ export function computeExportModel(
     excludedHours: excludedMinutes / 60,
   };
 }
+
+// ---- Prisma-row -> ExportInput adapter. Structural types so this stays
+// framework-free; a Prisma report loaded with items+assignments satisfies them.
+
+export interface RawItem {
+  jiraKey: string | null;
+  summary: string;
+  workedMinutes: number;
+  estimatedSeconds: number | null;
+  jiraStatus: string | null;
+  parentKey: string | null;
+  parentSummary: string | null;
+  portaNotes: string | null;
+  reviewerComment: string | null;
+  approval: "pending" | "approved" | "rejected";
+  assignments: { projectId: string }[];
+}
+
+export interface RawReport {
+  label: string;
+  periodStart: Date;
+  hourlyRateCzk: number | null;
+  items: RawItem[];
+}
+
+export function toExportInput(
+  report: RawReport,
+  jiraBaseUrl: string | null,
+): ExportInput {
+  return {
+    report: {
+      label: report.label,
+      periodStart: report.periodStart,
+      hourlyRateCzk: report.hourlyRateCzk,
+    },
+    items: report.items.map((it) => ({
+      jiraKey: it.jiraKey,
+      summary: it.summary,
+      workedMinutes: it.workedMinutes,
+      estimatedSeconds: it.estimatedSeconds,
+      jiraStatus: it.jiraStatus,
+      parentKey: it.parentKey,
+      parentSummary: it.parentSummary,
+      portaNotes: it.portaNotes,
+      reviewerComment: it.reviewerComment,
+      approval: it.approval,
+      assignedProjectIds: it.assignments.map((a) => a.projectId),
+    })),
+    jiraBaseUrl,
+  };
+}
