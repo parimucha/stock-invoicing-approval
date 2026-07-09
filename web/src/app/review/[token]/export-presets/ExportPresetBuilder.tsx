@@ -138,12 +138,16 @@ export function ExportPresetBuilder({
     }
   }, [input, config]);
 
+  const trimmedLabels = groups.map((g) => g.label.trim()).filter((l) => l !== "");
+  const hasDuplicateLabels = new Set(trimmedLabels).size !== trimmedLabels.length;
+
   const canSave =
     name.trim() !== "" &&
     config.columnGroups.length > 0 &&
     columns.length > 0 &&
     (tickets || overview) &&
-    (eurRate.trim() === "" || (Number.isFinite(Number(eurRate)) && Number(eurRate) > 0));
+    (eurRate.trim() === "" || (Number.isFinite(Number(eurRate)) && Number(eurRate) > 0)) &&
+    !hasDuplicateLabels;
 
   return (
     <div className="space-y-6">
@@ -332,31 +336,38 @@ export function ExportPresetBuilder({
           </label>
         </section>
 
-        {preview && (
-          <div className="bg-neutral-50 border border-neutral-200 rounded p-3 text-sm">
-            <p className="font-medium mb-1">Preview for {input.report.label}</p>
-            <ul className="space-y-0.5">
-              {preview.overview.groups.map((g) => (
-                <li key={g.key} className="flex justify-between">
-                  <span>{g.label}</span>
-                  <span>
-                    {g.hours.toFixed(2)} h
-                    {g.czk != null ? ` · ${g.czk.toLocaleString("cs-CZ")} Kč` : ""}
-                  </span>
+        {hasDuplicateLabels ? (
+          <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            Group names must be unique — rename the duplicated column label(s) to see the preview
+            and save.
+          </p>
+        ) : (
+          preview && (
+            <div className="bg-neutral-50 border border-neutral-200 rounded p-3 text-sm">
+              <p className="font-medium mb-1">Preview for {input.report.label}</p>
+              <ul className="space-y-0.5">
+                {preview.overview.groups.map((g) => (
+                  <li key={g.key} className="flex justify-between">
+                    <span>{g.label}</span>
+                    <span>
+                      {g.hours.toFixed(2)} h
+                      {g.czk != null ? ` · ${g.czk.toLocaleString("cs-CZ")} Kč` : ""}
+                    </span>
+                  </li>
+                ))}
+                <li className="flex justify-between font-semibold border-t border-neutral-200 pt-0.5">
+                  <span>Total</span>
+                  <span>{preview.overview.totalHours.toFixed(2)} h</span>
                 </li>
-              ))}
-              <li className="flex justify-between font-semibold border-t border-neutral-200 pt-0.5">
-                <span>Total</span>
-                <span>{preview.overview.totalHours.toFixed(2)} h</span>
-              </li>
-            </ul>
-            {preview.excludedHours > 0 && (
-              <p className="mt-2 text-amber-700">
-                ⚠ {preview.excludedHours.toFixed(2)} h of approved work fall outside these groups
-                and won&apos;t be exported.
-              </p>
-            )}
-          </div>
+              </ul>
+              {preview.excludedHours > 0 && (
+                <p className="mt-2 text-amber-700">
+                  ⚠ {preview.excludedHours.toFixed(2)} h of approved work fall outside these
+                  groups and won&apos;t be exported.
+                </p>
+              )}
+            </div>
+          )
         )}
 
         <button
