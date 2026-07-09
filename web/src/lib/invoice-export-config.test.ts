@@ -61,4 +61,21 @@ describe("parseExportPresetConfig", () => {
   it("rejects a non-object input", () => {
     expect(() => parseExportPresetConfig(null)).toThrow(/must be an object/);
   });
+
+  it("accepts valid columnHeaders", () => {
+    const cfg = parseExportPresetConfig({ ...valid(), columnHeaders: { country: "Country", note: "Note" } });
+    expect(cfg.columnHeaders).toEqual({ country: "Country", note: "Note" });
+  });
+
+  it("rejects columnHeaders that is an array", () => {
+    expect(() => parseExportPresetConfig({ ...valid(), columnHeaders: [] })).toThrow(/columnHeaders must be an object/);
+  });
+
+  it("rejects a columnHeaders key that isn't a valid column", () => {
+    expect(() => parseExportPresetConfig({ ...valid(), columnHeaders: { bogus: "x" } })).toThrow(/invalid key/);
+  });
+
+  it("rejects a non-string columnHeaders value", () => {
+    expect(() => parseExportPresetConfig({ ...valid(), columnHeaders: { note: 5 } })).toThrow(/must be a string/);
+  });
 });

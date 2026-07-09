@@ -29,6 +29,7 @@ export async function GET(
   }
 
   let preset: ExportPresetConfig = DEFAULT_PRESET;
+  let presetSuffix = "";
   if (presetId) {
     const row = await prisma.exportPreset.findUnique({ where: { id: presetId } });
     if (!row) return new Response("Preset not found", { status: 404 });
@@ -37,12 +38,13 @@ export async function GET(
     } catch {
       return new Response("Invalid preset configuration", { status: 422 });
     }
+    presetSuffix = `-${row.name.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
   }
 
   const model = computeExportModel(toExportInput(report, getJiraBaseUrl()), preset);
   const workbook = renderWorkbook(model, preset);
   const buffer = await workbook.xlsx.writeBuffer();
-  const filename = `invoice-${report.label}.xlsx`;
+  const filename = `invoice-${report.label}${presetSuffix}.xlsx`;
 
   return new Response(new Uint8Array(buffer as ArrayBuffer), {
     headers: {

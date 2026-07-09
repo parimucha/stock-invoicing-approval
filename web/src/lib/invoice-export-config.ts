@@ -80,7 +80,7 @@ export function parseExportPresetConfig(input: unknown): ExportPresetConfig {
   // ---- columnHeaders (optional) ----
   let columnHeaders: Partial<Record<TicketColumnKey, string>> | undefined;
   if (r.columnHeaders !== undefined && r.columnHeaders !== null) {
-    if (typeof r.columnHeaders !== "object") {
+    if (typeof r.columnHeaders !== "object" || Array.isArray(r.columnHeaders)) {
       throw new Error("columnHeaders must be an object.");
     }
     columnHeaders = {};

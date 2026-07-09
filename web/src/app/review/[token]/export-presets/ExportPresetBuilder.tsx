@@ -169,7 +169,14 @@ export function ExportPresetBuilder({
           <form action={deletePreset} className="ml-auto">
             <input type="hidden" name="token" value={token} />
             <input type="hidden" name="id" value={selectedId} />
-            <button className="text-sm text-red-600 hover:underline">Delete</button>
+            <button
+              className="text-sm text-red-600 hover:underline"
+              onClick={(e) => {
+                if (!window.confirm("Delete this shared preset? This can't be undone.")) e.preventDefault();
+              }}
+            >
+              Delete
+            </button>
           </form>
         )}
       </div>
