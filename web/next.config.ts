@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: here,
   },
+  // exceljs is a large CommonJS library used only by the invoice-export route
+  // handler. Letting Next bundle it into the server build breaks `next build`;
+  // keep it an external runtime require resolved from node_modules.
+  serverExternalPackages: ["exceljs"],
 };
 
 export default withSentryConfig(nextConfig, {
