@@ -84,4 +84,17 @@ describe("renderWorkbook", () => {
     const ws = renderWorkbook(model, preset).getWorksheet("Overview")!;
     expect(ws.getCell(3, 1).value).toBeNull();
   });
+
+  it("adds an excluded-hours row to the Overview sheet when hours fell outside all groups", () => {
+    const model = { ...sampleModel(), excludedHours: 3.5 };
+    const ws = renderWorkbook(model, preset).getWorksheet("Overview")!;
+    // Rows 1-4 are header/Hours/CZK/EUR; the excluded row should follow at row 5.
+    expect(ws.getCell(5, 1).value).toBe("Excluded (ungrouped) hours");
+    expect(ws.getCell(5, 2).value).toBe(3.5);
+  });
+
+  it("formats the Tickets hours column as a two-decimal number", () => {
+    const ws = renderWorkbook(sampleModel(), preset).getWorksheet("Tickets")!;
+    expect(ws.getColumn(5).numFmt).toBe("0.00");
+  });
 });
