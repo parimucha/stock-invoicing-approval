@@ -101,6 +101,16 @@ describe("buildProjectTimeMatrix", () => {
     expect(m.projects.map((p) => p.name)).toEqual(["Alpha", "Zeta", "Unassigned"]);
   });
 
+  it("registers a project from a zero-minute assigned item", () => {
+    const m = buildProjectTimeMatrix([
+      report(1, "2026-01", [
+        { workedMinutes: 0, assignments: [{ projectId: "p1", project: { name: "Alpha" } }] },
+      ]),
+    ]);
+    expect(m.projects).toEqual([{ id: "p1", name: "Alpha" }]);
+    expect(m.minutes[1].p1).toBe(0);
+  });
+
   it("keeps one row per report keyed by report id", () => {
     const m = buildProjectTimeMatrix([
       report(3, "2026-03", [{ workedMinutes: 20, assignments: [{ projectId: "p1", project: { name: "Alpha" } }] }]),

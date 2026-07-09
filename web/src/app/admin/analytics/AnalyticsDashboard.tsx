@@ -12,6 +12,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { UNASSIGNED_ID, type AnalyticsMatrix } from "@/lib/analytics";
+import { minutesToHours } from "@/lib/format";
 
 // Validated categorical palette from the `dataviz` skill — light-mode slots
 // 1–8 in fixed order (the ordering IS the CVD-safety mechanism; do not
@@ -32,6 +33,60 @@ const UNASSIGNED_COLOR = "#9ca3af"; // neutral gray — reads as "not a project"
 
 function toHours(min: number): number {
   return Math.round((min / 60) * 10) / 10;
+}
+
+// Minimal local shape for what ChartTooltip actually reads from recharts'
+// injected content props (recharts clones the `content` element with these
+// at render time — see Tooltip.tsx `renderContent`). Kept narrow and
+// independent of recharts' own (generic, awkward-to-satisfy-exactly)
+// TooltipContentProps type.
+type ChartTooltipPayloadEntry = {
+  name?: string | number;
+  value?: string | number | ReadonlyArray<string | number>;
+  color?: string;
+  dataKey?: string | number;
+};
+
+type ChartTooltipProps = {
+  active?: boolean;
+  label?: string | number;
+  payload?: ReadonlyArray<ChartTooltipPayloadEntry>;
+};
+
+function toNumber(v: ChartTooltipPayloadEntry["value"]): number {
+  if (typeof v === "number") return v;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Custom tooltip content (per design spec): per-project hours plus a month
+// total row, which the default recharts <Tooltip formatter=.../> can't show.
+function ChartTooltip({ active, label, payload }: ChartTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const total = payload.reduce((s, entry) => s + toNumber(entry.value), 0);
+  return (
+    <div className="bg-white border border-neutral-200 rounded shadow-sm p-2 text-xs">
+      <div className="font-medium mb-1">{label}</div>
+      <div className="space-y-0.5">
+        {payload.map((entry, i) => (
+          <div key={entry.dataKey ?? i} className="flex items-center gap-3 justify-between">
+            <span className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-2 h-2 rounded-sm shrink-0"
+                style={{ background: entry.color }}
+              />
+              {entry.name}
+            </span>
+            <span className="tabular-nums">{toNumber(entry.value).toFixed(1)} h</span>
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-neutral-200 mt-1 pt-1 flex justify-between font-medium">
+        <span>Total</span>
+        <span className="tabular-nums">{total.toFixed(1)} h</span>
+      </div>
+    </div>
+  );
 }
 
 export default function AnalyticsDashboard({ matrix }: { matrix: AnalyticsMatrix }) {
@@ -125,9 +180,7 @@ export default function AnalyticsDashboard({ matrix }: { matrix: AnalyticsMatrix
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                 <YAxis width={44} tick={{ fontSize: 12 }} />
-                <Tooltip
-                  formatter={(value, name) => [`${value ?? 0} h`, name ?? ""]}
-                />
+                <Tooltip content={<ChartTooltip />} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
                 {shownProjects.map((p, i) => (
                   <Bar
@@ -156,26 +209,28 @@ export default function AnalyticsDashboard({ matrix }: { matrix: AnalyticsMatrix
           >
             <ul className="space-y-1">
               {projects.map((p) => (
-                <li key={p.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedProjects.has(p.id)}
-                    onChange={() => toggleProject(p.id)}
-                  />
-                  <span
-                    className="inline-block w-3 h-3 rounded-sm shrink-0"
-                    style={{ background: colorByProject.get(p.id) }}
-                  />
-                  <span className="flex-1 truncate">{p.name}</span>
-                  <span className="tabular-nums text-neutral-600">
-                    {toHours(projectTotals.get(p.id) ?? 0)} h
-                  </span>
+                <li key={p.id}>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedProjects.has(p.id)}
+                      onChange={() => toggleProject(p.id)}
+                    />
+                    <span
+                      className="inline-block w-3 h-3 rounded-sm shrink-0"
+                      style={{ background: colorByProject.get(p.id) }}
+                    />
+                    <span className="flex-1 truncate">{p.name}</span>
+                    <span className="tabular-nums text-neutral-600">
+                      {minutesToHours(projectTotals.get(p.id) ?? 0)} h
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>
             <div className="border-t border-neutral-200 mt-2 pt-2 flex justify-between text-sm font-medium">
               <span>Total ({shownProjects.length})</span>
-              <span className="tabular-nums">{toHours(grandTotalMin)} h</span>
+              <span className="tabular-nums">{minutesToHours(grandTotalMin)} h</span>
             </div>
           </Panel>
 
@@ -191,16 +246,18 @@ export default function AnalyticsDashboard({ matrix }: { matrix: AnalyticsMatrix
                   0,
                 );
                 return (
-                  <li key={r.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selectedReports.has(r.id)}
-                      onChange={() => toggleReport(r.id)}
-                    />
-                    <span className="flex-1">{r.label}</span>
-                    <span className="tabular-nums text-neutral-600">
-                      {toHours(totalMin)} h
-                    </span>
+                  <li key={r.id}>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={selectedReports.has(r.id)}
+                        onChange={() => toggleReport(r.id)}
+                      />
+                      <span className="flex-1">{r.label}</span>
+                      <span className="tabular-nums text-neutral-600">
+                        {minutesToHours(totalMin)} h
+                      </span>
+                    </label>
                   </li>
                 );
               })}
