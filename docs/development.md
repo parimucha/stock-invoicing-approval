@@ -60,20 +60,31 @@ For ingestion scripts (root-level `.env`):
 
 ## Local debugging against the production database
 
-For chasing prod-only bugs without re-creating data on a local DB:
+Default to the local Docker Postgres. Reach for production only when the
+bug genuinely depends on real data, and only for as long as it takes.
+
+**Never pull into `.env.local` or `.env.production.local`.** Next loads
+those automatically ahead of `.env` (order: `.env.$(NODE_ENV).local` →
+`.env.local` → `.env.$(NODE_ENV)` → `.env`), so every later `npm run dev`
+silently talks to Neon — including runs where you thought you were local.
+Pull into `.env.vercel*` instead, which Next ignores, and load it
+explicitly in a subshell so it dies with the command:
 
 ```bash
 cd web
-vercel env pull .env.local --environment=production
-npm run dev
+vercel env pull .env.vercel --environment=production
+( set -a; . ./.env.vercel; set +a; npm run dev )
 ```
 
-Next.js loads `.env.local` ahead of `.env`, so `DATABASE_URL`, magic
-tokens, and admin password become the production values. Useful for
-reproducing bugs that depend on real reports or for verifying server
-actions before pushing. Any write you make in the UI hits prod — treat
-every Save / Mark / Refresh button as a real production write. Delete
-`web/.env.local` when you're done.
+Why the discipline: the dev server holds a Prisma connection pool open,
+which keeps resetting Neon's 5-minute scale-to-zero timer. A dev server
+left running against Neon bills 0.25 CU-hr per wall-clock hour — about
+6 CU-hrs/day, which exhausts a 100 CU-hr monthly plan in ~17 days, with
+no query volume at all. This has already happened once (July 2026).
+
+Any write you make in the UI hits prod — treat every Save / Mark /
+Refresh button as a real production write. `src/lib/prisma.ts` logs the
+database host on startup in dev and warns loudly when it isn't local.
 
 The `scripts/check-jira-api.js` standalone smoke test reuses the same
 env to verify the "Refresh JIRA statuses" path end-to-end without
