@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { createHmac, timingSafeEqual, randomBytes } from "node:crypto";
 
 const COOKIE_NAME = "porta_session";
@@ -43,6 +44,19 @@ export async function requireAdmin(): Promise<void> {
   if (!(await isAdmin())) {
     throw new Error("Unauthorized");
   }
+}
+
+// Page-render guard. Server Components under admin/ must call this as their
+// FIRST statement, before touching the database. The layout's isAdmin check
+// does NOT cover them: Next renders layouts and pages in parallel, so a page's
+// queries fire even when the layout is about to redirect an unauthenticated
+// visitor. Left ungated, every anonymous hit to /admin runs those queries —
+// which (with a database like Neon that scales to zero) keeps the compute
+// awake and billing. redirect() throws NEXT_REDIRECT, aborting the render
+// before any query runs; use this instead of the throwing requireAdmin() so an
+// unauthenticated visitor lands on /login rather than an error boundary.
+export async function requireAdminOrRedirect(): Promise<void> {
+  if (!(await isAdmin())) redirect("/login");
 }
 
 export async function signInAdmin(password: string): Promise<boolean> {

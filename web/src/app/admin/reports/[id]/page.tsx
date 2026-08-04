@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireAdminOrRedirect } from "@/lib/auth";
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 import { getJiraBaseUrl } from "@/lib/jira";
 import { PendingButton } from "@/components/PendingButton";
@@ -42,6 +42,8 @@ export default async function ReportDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireAdminOrRedirect();
+
   const { id } = await params;
   const reportId = Number(id);
   if (Number.isNaN(reportId)) notFound();

@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrRedirect } from "@/lib/auth";
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
 
 export default async function AdminHome() {
+  await requireAdminOrRedirect();
+
   const [reports, clients] = await Promise.all([
     prisma.report.findMany({
       orderBy: { label: "desc" },
