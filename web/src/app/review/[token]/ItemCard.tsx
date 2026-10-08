@@ -101,10 +101,23 @@ export function ItemCard({
     timer.current = setTimeout(flush, DEBOUNCE_MS);
   }
 
+  // The unmount cleanup below captures the first render's closure; route it
+  // through a ref so it flushes with the current `locked` value.
+  const flushRef = useRef(flush);
+  useEffect(() => {
+    flushRef.current = flush;
+  });
+
   useEffect(() => {
     return () => {
-      if (timer.current) clearTimeout(timer.current);
       if (savedResetTimer.current) clearTimeout(savedResetTimer.current);
+      // Flush instead of dropping a pending save. In "group by project" the
+      // card is rendered under the item's first assigned project, so ticking
+      // or unticking that project moves the card to another group — React
+      // unmounts this instance before the debounce fires, and clearing the
+      // timer here used to silently discard the change.
+      if (dirty.current) void flushRef.current();
+      else if (timer.current) clearTimeout(timer.current);
     };
   }, []);
 
@@ -113,6 +126,11 @@ export function ItemCard({
     if (on) next.add(id);
     else next.delete(id);
     const nextArr = [...next].sort();
+    // Update the snapshot eagerly (event handler, not render): if this toggle
+    // moves the card to another project group, this instance unmounts without
+    // committing the new `assigned` prop, so the sync effect above never runs
+    // and the unmount flush would otherwise save the old assignments.
+    latest.current = { ...latest.current, assigned: nextArr };
     onAssignedChange(nextArr);
     schedule();
   }
