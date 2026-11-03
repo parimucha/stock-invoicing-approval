@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatCzk, minutesToCzk, minutesToHours } from "@/lib/format";
@@ -39,6 +40,9 @@ export default async function ReviewPage({
   const exportPresets = await prisma.exportPreset.findMany({
     orderBy: { name: "asc" },
   });
+  // Reports aren't linked to a client yet (see Client in schema.prisma); with a
+  // single seeded client, link back to its dashboard listing every report.
+  const client = await prisma.client.findFirst({ orderBy: { createdAt: "asc" } });
   const locked = report.status === "approved" || report.status === "rejected";
   const pendingCount = report.items.reduce(
     (n, i) => (i.approval === "pending" ? n + 1 : n),
@@ -52,6 +56,14 @@ export default async function ReviewPage({
     <div className="min-h-screen bg-neutral-50">
       <header className="bg-white border-b border-neutral-200">
         <div className="max-w-6xl mx-auto px-6 py-4">
+          {client && (
+            <Link
+              href={`/client/${client.magicToken}`}
+              className="inline-block mb-1 text-sm text-neutral-500 hover:underline"
+            >
+              ← All {client.name} reports
+            </Link>
+          )}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold">Stock invoicing — {report.label}</h1>
