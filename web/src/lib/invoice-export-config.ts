@@ -4,6 +4,7 @@
 
 import type {
   ColumnGroup,
+  ExportGroupBy,
   ExportPresetConfig,
   TicketColumnKey,
 } from "./invoice-export";
@@ -17,6 +18,7 @@ const TICKET_COLUMN_KEYS: TicketColumnKey[] = [
   "note",
   "status",
   "parent",
+  "epic",
   "estimate",
 ];
 
@@ -26,8 +28,21 @@ export function parseExportPresetConfig(input: unknown): ExportPresetConfig {
   }
   const r = input as Record<string, unknown>;
 
+  // ---- groupBy (optional, absent = "projects") ----
+  let groupBy: ExportGroupBy = "projects";
+  if (r.groupBy !== undefined && r.groupBy !== null) {
+    if (r.groupBy !== "projects" && r.groupBy !== "epic") {
+      throw new Error(`groupBy must be "projects" or "epic".`);
+    }
+    groupBy = r.groupBy;
+  }
+
   // ---- columnGroups ----
-  if (!Array.isArray(r.columnGroups) || r.columnGroups.length === 0) {
+  // In epic mode the groups only filter projects, so an empty list is allowed.
+  if (
+    !Array.isArray(r.columnGroups) ||
+    (groupBy === "projects" && r.columnGroups.length === 0)
+  ) {
     throw new Error("columnGroups must be a non-empty array.");
   }
   const seenKeys = new Set<string>();
@@ -106,6 +121,9 @@ export function parseExportPresetConfig(input: unknown): ExportPresetConfig {
   if (!s.tickets && !s.overview) {
     throw new Error("At least one sheet must be enabled.");
   }
+  if (s.perGroup !== undefined && typeof s.perGroup !== "boolean") {
+    throw new Error("sheets.perGroup must be a boolean.");
+  }
 
   // ---- eurRate ----
   let eurRate: number | null;
@@ -118,10 +136,15 @@ export function parseExportPresetConfig(input: unknown): ExportPresetConfig {
   }
 
   return {
+    ...(groupBy === "epic" ? { groupBy } : {}),
     columnGroups,
     ticketColumns,
     ...(columnHeaders ? { columnHeaders } : {}),
-    sheets: { tickets: s.tickets, overview: s.overview },
+    sheets: {
+      tickets: s.tickets,
+      overview: s.overview,
+      ...(s.perGroup ? { perGroup: true } : {}),
+    },
     eurRate,
   };
 }

@@ -22,6 +22,35 @@ describe("parseExportPresetConfig", () => {
     expect(cfg.sheets).toEqual({ tickets: true, overview: true });
   });
 
+  it("leaves groupBy and perGroup off for a projects preset", () => {
+    const cfg = parseExportPresetConfig({ ...valid(), groupBy: "projects" });
+    expect(cfg.groupBy).toBeUndefined();
+    expect(cfg.sheets.perGroup).toBeUndefined();
+  });
+
+  it("accepts an epic preset with no project groups and perGroup sheets", () => {
+    const cfg = parseExportPresetConfig({
+      ...valid(),
+      groupBy: "epic",
+      columnGroups: [],
+      ticketColumns: ["epic", "ticket", "hours"],
+      sheets: { tickets: true, overview: true, perGroup: true },
+    });
+    expect(cfg.groupBy).toBe("epic");
+    expect(cfg.columnGroups).toEqual([]);
+    expect(cfg.sheets).toEqual({ tickets: true, overview: true, perGroup: true });
+  });
+
+  it("rejects an unknown groupBy", () => {
+    expect(() => parseExportPresetConfig({ ...valid(), groupBy: "country" })).toThrow(/groupBy/);
+  });
+
+  it("rejects a non-boolean sheets.perGroup", () => {
+    expect(() =>
+      parseExportPresetConfig({ ...valid(), sheets: { tickets: true, overview: true, perGroup: "yes" } }),
+    ).toThrow(/perGroup/);
+  });
+
   it("accepts null eurRate", () => {
     expect(parseExportPresetConfig({ ...valid(), eurRate: null }).eurRate).toBeNull();
   });

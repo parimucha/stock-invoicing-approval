@@ -27,6 +27,7 @@ function sampleModel(): ExportModel {
         note: "",
         status: null,
         parent: null,
+        epic: null,
         estimateHours: null,
         sortMinutes: 420,
       },
@@ -41,6 +42,7 @@ function sampleModel(): ExportModel {
         note: "Weekly status",
         status: null,
         parent: null,
+        epic: null,
         estimateHours: null,
         sortMinutes: 69,
       },
@@ -91,6 +93,26 @@ describe("renderWorkbook", () => {
     // Rows 1-4 are header/Hours/CZK/EUR; the excluded row should follow at row 5.
     expect(ws.getCell(5, 1).value).toBe("Excluded (ungrouped) hours");
     expect(ws.getCell(5, 2).value).toBe(3.5);
+  });
+
+  it("writes one tickets sheet per group with safe, unique names when perGroup is set", () => {
+    const model = sampleModel();
+    model.ticketRows[1] = { ...model.ticketRows[1], groupKey: "GER", groupLabel: "GER" };
+    model.overview.groups.push({ key: "X", label: "overview", hours: 0, czk: 0 });
+    model.ticketRows.push({ ...model.ticketRows[0], groupKey: "X", groupLabel: "overview" });
+    const wb = renderWorkbook(model, { ...preset, sheets: { tickets: true, overview: true, perGroup: true } });
+    expect(wb.worksheets.map((w) => w.name)).toEqual(["FR", "GER", "overview (2)", "Overview"]);
+    expect(wb.getWorksheet("FR")!.rowCount).toBe(2);
+    expect(wb.getWorksheet("Tickets")).toBeUndefined();
+  });
+
+  it("renders the epic column", () => {
+    const model = sampleModel();
+    model.ticketRows[0].epic = "PCM2-229 PIM GER";
+    const ws = renderWorkbook(model, { ...preset, ticketColumns: ["epic", "ticket"] }).getWorksheet("Tickets")!;
+    expect(ws.getCell(1, 1).value).toBe("Epic");
+    expect(ws.getCell(2, 1).value).toBe("PCM2-229 PIM GER");
+    expect(ws.getCell(3, 1).value).toBe("");
   });
 
   it("formats the Tickets hours column as a two-decimal number", () => {

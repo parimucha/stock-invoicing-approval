@@ -5,6 +5,7 @@ import {
   DEFAULT_PRESET,
   type ExportInput,
   type ExportItem,
+  type ExportPresetConfig,
 } from "./invoice-export";
 
 function item(partial: Partial<ExportItem>): ExportItem {
@@ -154,6 +155,65 @@ describe("computeExportModel", () => {
     );
     expect(model.overview.groups[0].czk).toBeNull();
     expect(model.overview.totalCzk).toBeNull();
+  });
+});
+
+describe("computeExportModel grouped by epic", () => {
+  const byEpic: ExportPresetConfig = { ...DEFAULT_PRESET, groupBy: "epic", columnGroups: [] };
+
+  it("groups rows by parent epic, biggest first, with no-parent and PM items last", () => {
+    const model = computeExportModel(
+      input([
+        item({ jiraKey: "A", workedMinutes: 60, parentKey: "PCM2-92", parentSummary: "PIM FR" }),
+        item({ jiraKey: "B", workedMinutes: 180, parentKey: "PCM2-229", parentSummary: "PIM GER " }),
+        item({ jiraKey: "C", workedMinutes: 30, parentKey: "PCM2-92", parentSummary: "PIM FR" }),
+        item({ jiraKey: null, summary: "Weekly call", workedMinutes: 600 }),
+        item({ jiraKey: "D", workedMinutes: 15 }),
+      ]),
+      byEpic,
+    );
+    expect(model.overview.groups.map((g) => [g.label, g.hours])).toEqual([
+      ["PCM2-229 PIM GER", 3],
+      ["PCM2-92 PIM FR", 1.5],
+      ["No epic", 10.25],
+    ]);
+    expect(model.ticketRows.map((r) => r.ticketLabel)).toEqual(["B", "A", "C", "PM", "D"]);
+    expect(model.ticketRows[0].epic).toBe("PCM2-229 PIM GER");
+    expect(model.ticketRows[3].epic).toBeNull();
+    expect(model.overview.totalHours).toBe(14.75);
+    expect(model.excludedHours).toBe(0);
+  });
+
+  it("counts every project when there are no project groups, and a split item once", () => {
+    const model = computeExportModel(
+      input([
+        item({
+          workedMinutes: 120,
+          parentKey: "PCM2-93",
+          assignedProjectIds: ["czech_pimcore", "slovak_pimcore"],
+        }),
+      ]),
+      byEpic,
+    );
+    expect(model.ticketRows).toHaveLength(1);
+    expect(model.ticketRows[0].hours).toBe(2);
+  });
+
+  it("uses project groups as a filter and excludes shares outside them", () => {
+    const model = computeExportModel(
+      input([
+        item({
+          workedMinutes: 120,
+          parentKey: "PCM2-93",
+          assignedProjectIds: ["french_pimcore", "czech_pimcore"],
+        }),
+        item({ workedMinutes: 60, assignedProjectIds: [] }),
+      ]),
+      { ...DEFAULT_PRESET, groupBy: "epic" },
+    );
+    expect(model.ticketRows).toHaveLength(1);
+    expect(model.ticketRows[0].hours).toBe(1);
+    expect(model.excludedHours).toBe(2);
   });
 });
 

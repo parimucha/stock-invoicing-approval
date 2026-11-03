@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   computeExportModel,
+  type ExportGroupBy,
   type ExportInput,
   type ExportPresetConfig,
   type TicketColumnKey,
@@ -18,6 +19,7 @@ const ALL_COLUMNS: TicketColumnKey[] = [
   "note",
   "status",
   "parent",
+  "epic",
   "estimate",
 ];
 const COLUMN_LABEL: Record<TicketColumnKey, string> = {
@@ -29,6 +31,7 @@ const COLUMN_LABEL: Record<TicketColumnKey, string> = {
   note: "Note",
   status: "Status",
   parent: "Parent",
+  epic: "Epic",
   estimate: "Estimate (h)",
 };
 const DEFAULT_COLUMNS: TicketColumnKey[] = [
@@ -65,34 +68,49 @@ export function ExportPresetBuilder({
 }) {
   const [selectedId, setSelectedId] = useState("new");
   const [name, setName] = useState("");
+  const [groupBy, setGroupBy] = useState<ExportGroupBy>("projects");
   const [groups, setGroups] = useState<UiGroup[]>([]);
   const [columns, setColumns] = useState<TicketColumnKey[]>(DEFAULT_COLUMNS);
   const [headers, setHeaders] = useState<Partial<Record<TicketColumnKey, string>>>({});
   const [tickets, setTickets] = useState(true);
   const [overview, setOverview] = useState(true);
+  const [perGroup, setPerGroup] = useState(false);
   const [eurRate, setEurRate] = useState("24.2");
 
   function loadPreset(id: string) {
     setSelectedId(id);
     if (id === "new") {
       setName("");
+      setGroupBy("projects");
       setGroups([]);
       setColumns(DEFAULT_COLUMNS);
       setHeaders({});
       setTickets(true);
       setOverview(true);
+      setPerGroup(false);
       setEurRate("24.2");
       return;
     }
     const p = presets.find((x) => x.id === id);
     if (!p) return;
     setName(p.name);
+    setGroupBy(p.config.groupBy ?? "projects");
     setGroups(p.config.columnGroups.map((g) => ({ label: g.label, projectIds: g.projectIds })));
     setColumns(p.config.ticketColumns);
     setHeaders(p.config.columnHeaders ?? {});
     setTickets(p.config.sheets.tickets);
     setOverview(p.config.sheets.overview);
+    setPerGroup(p.config.sheets.perGroup ?? false);
     setEurRate(p.config.eurRate == null ? "" : String(p.config.eurRate));
+  }
+
+  // Swap the Country column for Epic (and back) so the grouping column follows the mode.
+  function changeGroupBy(next: ExportGroupBy) {
+    setGroupBy(next);
+    const [from, to]: TicketColumnKey[] = next === "epic" ? ["country", "epic"] : ["epic", "country"];
+    setColumns((cols) =>
+      cols.includes(to) ? cols.filter((c) => c !== from) : cols.map((c) => (c === from ? to : c)),
+    );
   }
 
   // project id -> index of the group already using it (disable it elsewhere)
@@ -119,15 +137,16 @@ export function ExportPresetBuilder({
       if (h) cleanHeaders[k] = h;
     }
     return {
+      ...(groupBy === "epic" ? { groupBy } : {}),
       columnGroups: groups
         .filter((g) => g.label.trim() !== "")
         .map((g) => ({ key: g.label.trim(), label: g.label.trim(), projectIds: g.projectIds })),
       ticketColumns: columns,
       ...(Object.keys(cleanHeaders).length ? { columnHeaders: cleanHeaders } : {}),
-      sheets: { tickets, overview },
+      sheets: { tickets, overview, ...(perGroup ? { perGroup } : {}) },
       eurRate: eurRate.trim() === "" ? null : Number(eurRate),
     };
-  }, [groups, columns, headers, tickets, overview, eurRate]);
+  }, [groupBy, groups, columns, headers, tickets, overview, perGroup, eurRate]);
 
   // Live preview against THIS report — computeExportModel is pure, runs here.
   const preview = useMemo(() => {
@@ -143,7 +162,7 @@ export function ExportPresetBuilder({
 
   const canSave =
     name.trim() !== "" &&
-    config.columnGroups.length > 0 &&
+    (groupBy === "epic" || config.columnGroups.length > 0) &&
     columns.length > 0 &&
     (tickets || overview) &&
     (eurRate.trim() === "" || (Number.isFinite(Number(eurRate)) && Number(eurRate) > 0)) &&
@@ -200,9 +219,35 @@ export function ExportPresetBuilder({
           />
         </div>
 
+        <section className="space-y-1">
+          <h3 className="font-semibold text-sm">Group by</h3>
+          <div className="flex gap-4 text-sm">
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                checked={groupBy === "projects"}
+                onChange={() => changeGroupBy("projects")}
+              />{" "}
+              Project groups (e.g. FR / GER)
+            </label>
+            <label className="flex items-center gap-1">
+              <input
+                type="radio"
+                checked={groupBy === "epic"}
+                onChange={() => changeGroupBy("epic")}
+              />{" "}
+              Jira epic (stream)
+            </label>
+          </div>
+        </section>
+
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Output columns (project groups)</h3>
+            <h3 className="font-semibold text-sm">
+              {groupBy === "epic"
+                ? "Limit to projects (optional — no groups = all projects)"
+                : "Output columns (project groups)"}
+            </h3>
             <button
               type="button"
               onClick={() => setGroups((g) => [...g, { label: "", projectIds: [] }])}
@@ -211,7 +256,7 @@ export function ExportPresetBuilder({
               + Add group
             </button>
           </div>
-          {groups.length === 0 && (
+          {groups.length === 0 && groupBy === "projects" && (
             <p className="text-sm text-neutral-500 italic">Add at least one group (e.g. “FR”).</p>
           )}
           {groups.map((g, i) => (
@@ -331,6 +376,15 @@ export function ExportPresetBuilder({
               onChange={(e) => setOverview(e.target.checked)}
             />{" "}
             Overview sheet
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={perGroup}
+              disabled={!tickets}
+              onChange={(e) => setPerGroup(e.target.checked)}
+            />{" "}
+            One tickets sheet per {groupBy === "epic" ? "epic" : "group"}
           </label>
           <label className="flex items-center gap-1 ml-auto">
             EUR rate
