@@ -15,6 +15,7 @@ const COLUMN_LABELS: Record<TicketColumnKey, string> = {
   note: "Note",
   status: "Status",
   parent: "Parent",
+  epic: "Epic",
   estimate: "Estimate (h)",
 };
 
@@ -40,9 +41,44 @@ function ticketCell(row: ExportTicketRow, key: TicketColumnKey): CellValue {
       return row.status ?? "";
     case "parent":
       return row.parent ?? "";
+    case "epic":
+      return row.epic ?? "";
     case "estimate":
       return row.estimateHours ?? "";
   }
+}
+
+// Excel sheet names: max 31 chars, none of []:*?/\, unique case-insensitively.
+function uniqueSheetName(label: string, used: Set<string>): string {
+  const base = label.replace(/[[\]:*?\/\\]/g, " ").trim().slice(0, 31) || "Group";
+  let name = base;
+  for (let n = 2; [...used].some((u) => u.toLowerCase() === name.toLowerCase()); n++) {
+    const suffix = ` (${n})`;
+    name = base.slice(0, 31 - suffix.length) + suffix;
+  }
+  used.add(name);
+  return name;
+}
+
+function addTicketSheet(
+  workbook: ExcelJS.Workbook,
+  name: string,
+  rows: ExportTicketRow[],
+  preset: ExportPresetConfig,
+) {
+  const ws = workbook.addWorksheet(name);
+  ws.addRow(
+    preset.ticketColumns.map(
+      (k) => preset.columnHeaders?.[k] ?? COLUMN_LABELS[k],
+    ),
+  );
+  ws.getRow(1).font = { bold: true };
+  for (const row of rows) {
+    ws.addRow(preset.ticketColumns.map((k) => ticketCell(row, k)));
+  }
+
+  const hoursIdx = preset.ticketColumns.indexOf("hours");
+  if (hoursIdx >= 0) ws.getColumn(hoursIdx + 1).numFmt = "0.00";
 }
 
 export function renderWorkbook(
@@ -53,19 +89,16 @@ export function renderWorkbook(
   workbook.creator = "Proficio";
 
   if (preset.sheets.tickets) {
-    const ws = workbook.addWorksheet("Tickets");
-    ws.addRow(
-      preset.ticketColumns.map(
-        (k) => preset.columnHeaders?.[k] ?? COLUMN_LABELS[k],
-      ),
-    );
-    ws.getRow(1).font = { bold: true };
-    for (const row of model.ticketRows) {
-      ws.addRow(preset.ticketColumns.map((k) => ticketCell(row, k)));
+    if (preset.sheets.perGroup) {
+      const used = new Set(["Overview"]);
+      for (const g of model.overview.groups) {
+        const rows = model.ticketRows.filter((r) => r.groupKey === g.key);
+        if (rows.length === 0) continue;
+        addTicketSheet(workbook, uniqueSheetName(g.label, used), rows, preset);
+      }
+    } else {
+      addTicketSheet(workbook, "Tickets", model.ticketRows, preset);
     }
-
-    const hoursIdx = preset.ticketColumns.indexOf("hours");
-    if (hoursIdx >= 0) ws.getColumn(hoursIdx + 1).numFmt = "0.00";
   }
 
   if (preset.sheets.overview) {

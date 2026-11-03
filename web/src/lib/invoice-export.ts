@@ -12,7 +12,13 @@ export type TicketColumnKey =
   | "note"
   | "status"
   | "parent"
+  | "epic"
   | "estimate";
+
+// "projects": rows/overview columns are the preset's project groups.
+// "epic": rows/overview columns are the items' Jira parent (epic); project
+// groups then only filter which projects count (empty = all projects).
+export type ExportGroupBy = "projects" | "epic";
 
 export interface ColumnGroup {
   key: string;
@@ -21,10 +27,12 @@ export interface ColumnGroup {
 }
 
 export interface ExportPresetConfig {
+  groupBy?: ExportGroupBy; // absent = "projects"
   columnGroups: ColumnGroup[];
   ticketColumns: TicketColumnKey[];
   columnHeaders?: Partial<Record<TicketColumnKey, string>>;
-  sheets: { tickets: boolean; overview: boolean };
+  // perGroup: one tickets sheet per group instead of a single Tickets sheet.
+  sheets: { tickets: boolean; overview: boolean; perGroup?: boolean };
   eurRate: number | null;
 }
 
@@ -65,6 +73,7 @@ export interface ExportTicketRow {
   note: string;
   status: string | null;
   parent: string | null;
+  epic: string | null; // "PCM2-229 PIM GER", or null when the item has no parent
   estimateHours: number | null;
   sortMinutes: number; // item.workedMinutes, for ordering only
 }
@@ -100,6 +109,14 @@ export const DEFAULT_PRESET: ExportPresetConfig = {
   eurRate: 24.2,
 };
 
+export const NO_EPIC_KEY = "__no_epic__";
+export const NO_EPIC_LABEL = "No epic";
+
+function epicLabel(it: ExportItem): string | null {
+  if (!it.parentKey) return null;
+  return `${it.parentKey} ${it.parentSummary ?? ""}`.trim();
+}
+
 function jiraUrl(base: string | null, key: string): string | null {
   if (!base) return null;
   return `${base.replace(/\/+$/, "")}/browse/${key}`;
@@ -120,8 +137,19 @@ export function computeExportModel(
     }
   }
 
+  const byEpic = preset.groupBy === "epic";
+  const allProjects = byEpic && preset.columnGroups.length === 0;
+
+  // Insertion order is the column order in "projects" mode; epic mode
+  // re-sorts below once totals are known.
   const groupMinutes = new Map<string, number>();
-  for (const g of preset.columnGroups) groupMinutes.set(g.key, 0);
+  const groupLabels = new Map<string, string>();
+  if (!byEpic) {
+    for (const g of preset.columnGroups) {
+      groupMinutes.set(g.key, 0);
+      groupLabels.set(g.key, g.label);
+    }
+  }
 
   const ticketRows: ExportTicketRow[] = [];
   let excludedMinutes = 0;
@@ -134,27 +162,32 @@ export function computeExportModel(
       continue;
     }
     const share = it.workedMinutes / assigned.length;
+    const epic = epicLabel(it);
 
     // Sum this item's shares per group (several assigned projects can map to
-    // the same group -> a single row).
+    // the same group -> a single row; in epic mode every share lands in the
+    // item's one epic group).
     const perGroupForItem = new Map<string, number>();
     for (const pid of assigned) {
       const g = groupByProject.get(pid);
-      if (!g) {
+      if (!g && !allProjects) {
         excludedMinutes += share;
         continue;
       }
-      perGroupForItem.set(g.key, (perGroupForItem.get(g.key) ?? 0) + share);
+      const key = byEpic ? (it.parentKey ?? NO_EPIC_KEY) : g!.key;
+      if (!groupLabels.has(key)) {
+        groupLabels.set(key, byEpic ? (epic ?? NO_EPIC_LABEL) : g!.label);
+      }
+      perGroupForItem.set(key, (perGroupForItem.get(key) ?? 0) + share);
     }
 
     const isPm = it.jiraKey === null;
-    for (const g of preset.columnGroups) {
-      const mins = perGroupForItem.get(g.key);
-      if (mins == null || mins === 0) continue;
-      groupMinutes.set(g.key, (groupMinutes.get(g.key) ?? 0) + mins);
+    for (const [key, mins] of perGroupForItem) {
+      if (mins === 0) continue;
+      groupMinutes.set(key, (groupMinutes.get(key) ?? 0) + mins);
       ticketRows.push({
-        groupKey: g.key,
-        groupLabel: g.label,
+        groupKey: key,
+        groupLabel: groupLabels.get(key)!,
         month: monthNumber,
         ticketLabel: isPm ? "PM" : it.jiraKey!,
         jiraUrl: isPm ? null : jiraUrl(input.jiraBaseUrl, it.jiraKey!),
@@ -163,6 +196,7 @@ export function computeExportModel(
         note: isPm ? it.summary : (it.reviewerComment ?? it.portaNotes ?? ""),
         status: it.jiraStatus,
         parent: it.parentKey,
+        epic,
         estimateHours:
           it.estimatedSeconds == null ? null : it.estimatedSeconds / 3600,
         sortMinutes: it.workedMinutes,
@@ -170,8 +204,18 @@ export function computeExportModel(
     }
   }
 
-  // Order: configured group order, then worked time desc within a group.
-  const groupOrder = new Map(preset.columnGroups.map((g, i) => [g.key, i]));
+  // Epic mode: biggest epic first, "No epic" always last.
+  const groupKeys = [...groupMinutes.keys()];
+  if (byEpic) {
+    groupKeys.sort((a, b) => {
+      if (a === NO_EPIC_KEY) return 1;
+      if (b === NO_EPIC_KEY) return -1;
+      return groupMinutes.get(b)! - groupMinutes.get(a)!;
+    });
+  }
+
+  // Order: group order, then worked time desc within a group.
+  const groupOrder = new Map(groupKeys.map((k, i) => [k, i]));
   ticketRows.sort((a, b) => {
     const ga = groupOrder.get(a.groupKey) ?? 0;
     const gb = groupOrder.get(b.groupKey) ?? 0;
@@ -179,11 +223,11 @@ export function computeExportModel(
     return b.sortMinutes - a.sortMinutes;
   });
 
-  const groups: ExportOverviewGroup[] = preset.columnGroups.map((g) => {
-    const mins = groupMinutes.get(g.key) ?? 0;
+  const groups: ExportOverviewGroup[] = groupKeys.map((key) => {
+    const mins = groupMinutes.get(key) ?? 0;
     return {
-      key: g.key,
-      label: g.label,
+      key,
+      label: groupLabels.get(key)!,
       hours: mins / 60,
       czk: rate == null ? null : Math.ceil((mins / 60) * rate),
     };
