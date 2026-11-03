@@ -33,6 +33,12 @@ revisit. Every new report you mark as sent shows up automatically.
 The per-report magic link still works directly for anyone who already
 has it — the dashboard is an entry point, not a replacement.
 
+Every review page links back to the dashboard (**← All Stock reports**).
+Reports aren't tied to a client yet, so the link goes to the first
+client's dashboard. As a result, **a per-report link also gives access
+to every other non-draft report** — treat both links as equally
+sensitive.
+
 The token is seeded once on first deploy (via `prisma/seed.ts`) and
 preserved across re-seeds — re-running the seed doesn't rotate the
 URL. To rotate, delete the `Client` row in the DB and re-seed.

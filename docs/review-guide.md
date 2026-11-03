@@ -20,7 +20,9 @@ Stock also gets a separate **client dashboard** URL
 (`/client/<token>`) that lists every non-draft report with its status
 and totals, with links straight into each report. Bookmark the
 dashboard once and revisit instead of tracking per-report links —
-the per-report links keep working either way.
+the per-report links keep working either way. Each review page has an
+**← All Stock reports** link at the top that leads back to the
+dashboard.
 
 ## Page layout
 
